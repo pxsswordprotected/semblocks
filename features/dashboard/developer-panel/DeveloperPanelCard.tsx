@@ -347,19 +347,28 @@ function EnrichmentSection({
 
   return (
     <div className="flex flex-col gap-2 text-sm">
+      <StatRow label="OCR rows" value={formatCount(counts.ocr_rows)} />
       <StatRow
-        label="OCR rows / errors"
-        value={`${formatCount(counts.ocr_rows)} / ${formatCount(counts.ocr_errors)}`}
+        label="OCR errors"
+        value={formatCount(counts.ocr_errors)}
         urgent={counts.ocr_errors > 0}
       />
       <StatRow
-        label="External rows / errors"
-        value={`${formatCount(counts.external_content_rows)} / ${formatCount(counts.external_content_errors)}`}
+        label="External content rows"
+        value={formatCount(counts.external_content_rows)}
+      />
+      <StatRow
+        label="External content errors"
+        value={formatCount(counts.external_content_errors)}
         urgent={counts.external_content_errors > 0}
       />
       <StatRow
-        label="Transcript rows / errors"
-        value={`${formatCount(counts.transcript_rows)} / ${formatCount(counts.transcript_errors)}`}
+        label="Transcript rows"
+        value={formatCount(counts.transcript_rows)}
+      />
+      <StatRow
+        label="Transcript errors"
+        value={formatCount(counts.transcript_errors)}
         urgent={counts.transcript_errors > 0}
       />
       <StatRow label="Chunks" value={formatCount(counts.chunks)} />
@@ -367,12 +376,6 @@ function EnrichmentSection({
         label="Chunk embeddings"
         value={formatCount(counts.chunk_embeddings)}
       />
-      <NeedAction label="OCR errors" count={counts.ocr_errors} />
-      <NeedAction
-        label="External content errors"
-        count={counts.external_content_errors}
-      />
-      <NeedAction label="Transcript errors" count={counts.transcript_errors} />
     </div>
   );
 }
@@ -560,13 +563,6 @@ function StatRow({
   );
 }
 
-function NeedAction({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="rounded-base border border-stroke bg-white/25 px-2 py-1.5 text-xs leading-4 text-black/60">
-      {label}: <span className={cn("font-bold", count > 0 && "text-error")}>{formatCount(count)}</span>
-    </div>
-  );
-}
 
 function StatusPlaceholder({
   error,
