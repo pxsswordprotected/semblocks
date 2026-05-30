@@ -15,7 +15,21 @@ type RankingTableCardProps = {
   recommendation: RecommendationState;
 };
 
-const RECOMMENDATIONS_PER_PAGE = 3;
+const RECOMMENDATIONS_PER_PAGE = 4;
+
+type ConfidenceLevel = "High" | "Medium" | "Low";
+
+const CONFIDENCE_PILL_SHADOW = [
+  "0 1px 1px rgb(0 0 0 / 0.10)",
+  "inset 1px 1px 2.8px rgb(245 245 245 / 0.80)",
+  "inset 0 0 0 1px rgb(0 0 0 / 0.10)",
+].join(", ");
+
+function getConfidenceLevel(score: number): ConfidenceLevel {
+  if (score >= 0.75) return "High";
+  if (score >= 0.45) return "Medium";
+  return "Low";
+}
 
 export function RankingTableCard({
   className,
@@ -168,7 +182,9 @@ function RecommendationRow({
           <span title={title}>{title}</span>
         )}
       </div>
-      <div className="tabular-nums text-black/50">{channel.score.toFixed(3)}</div>
+      <div>
+        <ConfidencePill score={channel.score} />
+      </div>
       <div
         className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis text-black/70"
         title={evidence}
@@ -178,6 +194,27 @@ function RecommendationRow({
     </div>
   );
 }
+
+function ConfidencePill({ score }: { score: number }) {
+  const level = getConfidenceLevel(score);
+
+  return (
+    <span
+      title={score.toFixed(3)}
+      className={cn(
+        "inline-flex h-6 min-w-16 items-center justify-center rounded-pill px-3",
+        "text-xs leading-none font-bold text-white select-none",
+        level === "High" && "bg-neutral-800",
+        level === "Medium" && "bg-neutral-600",
+        level === "Low" && "bg-neutral-400",
+      )}
+      style={{ boxShadow: CONFIDENCE_PILL_SHADOW }}
+    >
+      {level}
+    </span>
+  );
+}
+
 
 function RecommendationFooter({
   page,

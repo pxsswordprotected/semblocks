@@ -167,13 +167,13 @@ function ChannelsCardInner({
 
   return (
     <Panel className={cn("flex flex-col py-4", className)}>
-      <h2 className="px-6 text-xl leading-5 font-bold text-neutral-800">
+      <h2 className="px-6 text-base leading-5 font-bold text-neutral-800">
         Channels
       </h2>
 
       <div className="mt-4 h-px shrink-0 bg-stroke" />
 
-      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-between px-6">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-evenly px-6">
         {channelsError ? (
           <div className="text-sm text-error">
             Couldn&apos;t load channels: {channelsError}.{" "}
@@ -214,9 +214,9 @@ function ChannelsCardInner({
         )}
       </div>
 
-      <div className="mt-4 h-px shrink-0 bg-stroke" />
+      <div className="h-px shrink-0 bg-stroke" />
 
-      <div className="mt-4 flex items-center justify-between gap-3 px-6 text-sm text-black/50">
+      <div className="mt-4 flex h-5 items-center justify-between gap-3 px-6 text-sm text-black/50">
         <p className="whitespace-nowrap">
           Showing {showingStart}–{showingEnd} of {totalChannels}
         </p>
