@@ -235,10 +235,7 @@ export function DeveloperPanelCard({
               >
                 <div
                   aria-disabled={disabled}
-                  className={cn(
-                    "flex items-center justify-between gap-3 px-3 py-2",
-                    disabled ? "cursor-not-allowed" : "cursor-pointer",
-                  )}
+                  className="flex items-center justify-between gap-3 px-3 py-2"
                   onClick={() => {
                     if (!disabled) toggleSection(section.id);
                   }}
