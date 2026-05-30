@@ -27,9 +27,9 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
   }, []);
 
   return (
-    <main className="flex min-h-screen flex-col gap-12 p-page">
+    <main className="flex h-screen min-h-0 flex-col gap-12 overflow-hidden p-page">
       {/* TOP BAR */}
-      <div className="flex flex-row gap-12">
+      <div className="flex shrink-0 flex-row gap-12">
         <BrandCard className={`${SIDEBAR_W} min-h-[72px]`} />
         <div className="flex flex-1 flex-row gap-9">
           <ProfileCard className="min-h-[72px] flex-[1]" />
@@ -39,9 +39,9 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
       </div>
 
       {/* BODY — flex-1 so the bottom row reaches the 32px page margin. */}
-      <div className="flex flex-1 flex-row gap-12">
+      <div className="flex min-h-0 flex-1 flex-row gap-12">
         {/* LEFT SIDEBAR */}
-        <div className={`flex flex-col gap-12 ${SIDEBAR_W}`}>
+        <div className={`flex min-h-0 flex-col gap-12 ${SIDEBAR_W}`}>
           <ChannelsCard
             className="h-[520px] shrink-0"
             onSelectionChange={onChannelSelectionChange}
@@ -50,12 +50,12 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
         </div>
 
         {/* MAIN CONTENT */}
-        <div className="flex flex-1 flex-col gap-12">
+        <div className="flex min-h-0 flex-1 flex-col gap-12">
           <BlocksTableCard
             className="h-[520px] w-full shrink-0"
             selectedChannels={selectedChannels}
           />
-          <div className="flex w-full flex-1 flex-row">
+          <div className="flex min-h-0 w-full flex-1 flex-row">
             <RecQueryInputCard
               className="h-full flex-[1] rounded-r-none border-r-0"
               onStateChange={setRecommendation}

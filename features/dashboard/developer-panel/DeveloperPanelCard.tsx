@@ -197,8 +197,8 @@ export function DeveloperPanelCard({
   }
 
   return (
-    <Panel className={cn("flex min-h-0 flex-col py-3", className)}>
-      <div className="min-h-0 flex-1 overflow-y-auto px-3">
+    <Panel className={cn("flex min-h-0 flex-col overflow-hidden py-3", className)}>
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-2">
           {SECTIONS.map((section) => {
             const open = openSections.has(section.id);
