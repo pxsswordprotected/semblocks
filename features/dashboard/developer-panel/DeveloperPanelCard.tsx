@@ -41,6 +41,12 @@ const SECTIONS: readonly { id: SectionId; title: string }[] = [
 
 const NUMBER_FORMATTER = new Intl.NumberFormat("en-US");
 
+const NON_DEV_DISABLED_TOOLTIP = "Disabled because you are not in dev mode.";
+
+function isDevModeOnlySection(id: SectionId): boolean {
+  return id === "actions" || id === "debug";
+}
+
 export function DeveloperPanelCard({
   className,
   ownerMode = false,
@@ -86,7 +92,21 @@ export function DeveloperPanelCard({
   const actionLocked = !ownerMode || Boolean(busyAction);
   const syncLocked = actionLocked || !ingestUser;
 
+
+  useEffect(() => {
+    if (ownerMode) return;
+    setOpenSections((prev) => {
+      if (!prev.has("actions") && !prev.has("debug")) return prev;
+      const next = new Set(prev);
+      next.delete("actions");
+      next.delete("debug");
+      return next;
+    });
+  }, [ownerMode]);
+
   function toggleSection(id: SectionId) {
+    if (!ownerMode && isDevModeOnlySection(id)) return;
+
     setOpenSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -201,15 +221,35 @@ export function DeveloperPanelCard({
       <div className="min-h-0 flex-1 overflow-y-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex flex-col gap-2">
           {SECTIONS.map((section) => {
-            const open = openSections.has(section.id);
+            const disabled = !ownerMode && isDevModeOnlySection(section.id);
+            const open = !disabled && openSections.has(section.id);
             const Icon = open ? CaretUp : CaretDown;
             return (
               <div
                 key={section.id}
-                className="overflow-hidden rounded-base border border-stroke bg-white/20"
+                title={disabled ? NON_DEV_DISABLED_TOOLTIP : undefined}
+                className={cn(
+                  "overflow-hidden rounded-base border border-stroke bg-white/20",
+                  disabled && "opacity-60",
+                )}
               >
-                <div className="flex items-center justify-between gap-3 px-3 py-2">
-                  <h2 className="text-sm leading-5 font-bold text-neutral-800">
+                <div
+                  aria-disabled={disabled}
+                  className={cn(
+                    "flex items-center justify-between gap-3 px-3 py-2",
+                    disabled ? "cursor-not-allowed" : "cursor-pointer",
+                  )}
+                  onClick={() => {
+                    if (!disabled) toggleSection(section.id);
+                  }}
+                  title={disabled ? NON_DEV_DISABLED_TOOLTIP : undefined}
+                >
+                  <h2
+                    className={cn(
+                      "text-sm leading-5 font-bold text-neutral-800",
+                      disabled && "text-black/50",
+                    )}
+                  >
                     {section.title}
                   </h2>
                   <Button
@@ -218,7 +258,12 @@ export function DeveloperPanelCard({
                     aria-expanded={open}
                     aria-controls={`developer-panel-${section.id}`}
                     aria-label={`${open ? "Collapse" : "Expand"} ${section.title}`}
-                    onClick={() => toggleSection(section.id)}
+                    disabled={disabled}
+                    title={disabled ? NON_DEV_DISABLED_TOOLTIP : undefined}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleSection(section.id);
+                    }}
                     className="h-7 min-w-7 shrink-0 px-1.5 py-0"
                   >
                     <Icon size={14} weight="bold" />
@@ -487,7 +532,7 @@ function ActionButton({
       variant="muted"
       disabled={disabled}
       onClick={onClick}
-      className="w-full justify-start px-3 py-2 text-left"
+      className="w-full px-3 py-2 text-center"
     >
       {busy ? busyLabel : label}
     </Button>
