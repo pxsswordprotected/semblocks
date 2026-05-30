@@ -10,3 +10,4 @@ out
 .DS_Store
 next-env.d.ts.bak
 *.md
+!features/dashboard/developer-panel/README.md
