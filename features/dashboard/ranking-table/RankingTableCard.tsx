@@ -37,7 +37,6 @@ export function RankingTableCard({
 }: RankingTableCardProps) {
   return (
     <Panel className={cn("flex flex-col py-4", className)}>
-
       <div
         className="grid gap-4 px-6 text-base leading-5 font-bold text-neutral-800"
         style={{ gridTemplateColumns: RECOMMENDATION_GRID_COLUMNS }}
@@ -111,10 +110,7 @@ function RecommendationBody({
     start,
     start + RECOMMENDATIONS_PER_PAGE,
   );
-  const slotCount = Math.max(
-    visibleChannels.length,
-    RECOMMENDATIONS_PER_PAGE,
-  );
+  const slotCount = Math.max(visibleChannels.length, RECOMMENDATIONS_PER_PAGE);
 
   return (
     <>
@@ -202,7 +198,7 @@ function ConfidencePill({ score }: { score: number }) {
     <span
       title={score.toFixed(3)}
       className={cn(
-        "inline-flex h-6 min-w-16 items-center justify-center rounded-pill px-3",
+        "inline-flex min-w-14 items-center justify-center rounded-pill px-2 py-1.5",
         "text-xs leading-none font-bold text-white select-none",
         level === "High" && "bg-neutral-800",
         level === "Medium" && "bg-neutral-600",
@@ -214,7 +210,6 @@ function ConfidencePill({ score }: { score: number }) {
     </span>
   );
 }
-
 
 function RecommendationFooter({
   page,
