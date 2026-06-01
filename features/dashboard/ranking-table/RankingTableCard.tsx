@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { getPageItems } from "../blocks-table/pagination";
 import type { RecommendationState, RecChannel } from "../recommendations/types";
 import { RECOMMENDATION_GRID_COLUMNS } from "./columns";
-import { formatChannelTitle, formatEvidence } from "./format";
+import { EvidenceBlocksHover } from "./EvidenceBlocksHover";
+import { formatChannelTitle, formatEvidence, formatEvidenceText } from "./format";
 
 type RankingTableCardProps = {
   className?: string;
@@ -155,7 +156,7 @@ function RecommendationRow({
   rank: number;
 }) {
   const title = formatChannelTitle(channel.channel_title);
-  const evidence = formatEvidence(channel);
+  const evidence = formatEvidenceText(channel);
 
   return (
     <div
@@ -182,10 +183,16 @@ function RecommendationRow({
         <ConfidencePill score={channel.score} />
       </div>
       <div
-        className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis text-black/70"
-        title={evidence}
+        className="flex min-w-0 items-center gap-2 overflow-hidden text-black/70"
+        title={formatEvidence(channel)}
       >
-        {evidence}
+        <EvidenceBlocksHover blocks={evidenceBlocksFor(channel)} />
+        <span aria-hidden="true" className="text-black/30">
+          |
+        </span>
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          {evidence}
+        </span>
       </div>
     </div>
   );
@@ -209,6 +216,21 @@ function ConfidencePill({ score }: { score: number }) {
       {level}
     </span>
   );
+}
+
+function evidenceBlocksFor(channel: RecChannel) {
+  if (channel.top_blocks.length > 0) {
+    return channel.top_blocks.map((block) => ({
+      id: block.arena_block_id,
+      title: block.title,
+      href: block.arena_url,
+    }));
+  }
+
+  return Array.from({ length: channel.block_count }, (_, index) => ({
+    id: `${channel.channel_id}-${index}`,
+    title: `Block ${index + 1}`,
+  }));
 }
 
 function RecommendationFooter({
