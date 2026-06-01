@@ -20,14 +20,14 @@
 // the existing vec_blocks row is dropped so the next embed pass picks
 // up the fattened search_text.
 
-import { getDb } from "@/lib/db";
-import { buildSearchText } from "@/lib/search-text";
-import { cleanLinkMarkdown } from "@/lib/link-clean";
+import { getDb } from "./db.ts";
+import { buildSearchText } from "./search-text.ts";
+import { cleanLinkMarkdown } from "./link-clean.ts";
 import {
   clearChunksForBlock,
   EXTERNAL_CONTENT_CHUNK_TYPE,
   rebuildChunksForBlock,
-} from "@/lib/chunks";
+} from "./chunks.ts";
 
 // Full markdown stored for debugging / future re-ranking.
 const EXTERNAL_CONTENT_STORE_MAX_CHARS = 40_000;

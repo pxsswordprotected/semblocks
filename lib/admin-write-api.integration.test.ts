@@ -16,6 +16,7 @@ const WRITE_ENDPOINTS = [
   "/api/external-content",
   "/api/transcripts",
   "/api/chunks",
+  "/api/sync",
 ] as const;
 
 test("admin write APIs reject unauthenticated and tampered cookies", { timeout: 120_000 }, async () => {
@@ -97,12 +98,14 @@ test("valid admin cookie reaches write route validation", { timeout: 120_000 }, 
   try {
     await waitForServer(`${baseUrl}/dev`, output);
     const token = createAdminSessionToken(secret, { now: Math.floor(Date.now() / 1000) });
-    const res = await fetch(`${baseUrl}/api/arena/ingest`, {
-      method: "POST",
-      headers: { cookie: `${ADMIN_COOKIE_NAME}=${token}` },
-    });
-    assert.equal(res.status, 400);
-    assert.deepEqual(await res.json(), { error: "Missing ?user=" });
+    for (const endpoint of ["/api/arena/ingest", "/api/sync"] as const) {
+      const res = await fetch(`${baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: { cookie: `${ADMIN_COOKIE_NAME}=${token}` },
+      });
+      assert.equal(res.status, 400, `${endpoint} should validate missing user`);
+      assert.deepEqual(await res.json(), { error: "Missing ?user=" });
+    }
   } finally {
     await stopServer(server);
   }

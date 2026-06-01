@@ -13,13 +13,13 @@
 // The low-level vision call (prompt, model, response parsing) lives in
 // `lib/vision.ts` so the same machinery powers query-time image search.
 
-import { getDb } from "@/lib/db";
-import { buildSearchText } from "@/lib/search-text";
+import { getDb } from "./db.ts";
+import { buildSearchText } from "./search-text.ts";
 import {
   VISION_MODEL,
   parseVisionResponse,
   visionCaption,
-} from "@/lib/vision";
+} from "./vision.ts";
 
 // OpenAI tier-1 cap on gpt-4o-mini is 20,000 TPM. A single high-detail
 // vision call is ~1500 input + ~500 output tokens, so we serialize and

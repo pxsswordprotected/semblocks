@@ -1,10 +1,8 @@
 import { User } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
+import { PROFILE_URL, PROFILE_USERNAME } from "@/features/dashboard/profile/profile";
 
-// Hardcoded until profile data lands.
-const USERNAME = "j-arab1hdgxzs";
-const PROFILE_URL = `https://www.are.na/${USERNAME}/channels`;
 
 export function ProfileCard({ className }: { className?: string }) {
   return (
@@ -18,7 +16,7 @@ export function ProfileCard({ className }: { className?: string }) {
         <User size={28} />
         <span select-none>
           Connected profile:{" "}
-          <span className="text-neutral-800">{USERNAME}</span>
+          <span className="text-neutral-800">{PROFILE_USERNAME}</span>
         </span>
       </div>
       <a

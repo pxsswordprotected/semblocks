@@ -1,24 +1,23 @@
-// Persist an Are.na user's channels + the first page of each channel's
-// contents into the local SQLite store. Idempotent: re-running for the
+// Persist an Are.na user's channels + all fetched channel contents into the
+// local SQLite store. Idempotent: re-running for the
 // same user updates rows in place, keyed on Are.na IDs / username.
 
+import type Database from "better-sqlite3";
 import {
   ArenaError,
   getAllUserChannels,
-  getChannelContents,
+  getAllChannelBlocks,
   getUser,
-  isArenaBlock,
   type ArenaBlock,
   type ArenaChannel,
   type ArenaUser,
-} from "@/lib/arena";
-import { getDb } from "@/lib/db";
-import { buildSearchText } from "@/lib/search-text";
-import { EXTERNAL_CONTENT_EMBED_SLICE_CHARS } from "@/lib/external-content";
-import { TRANSCRIPT_EMBED_SLICE_CHARS } from "@/lib/transcripts";
+} from "./arena.ts";
+import { getDb } from "./db.ts";
+import { buildSearchText } from "./search-text.ts";
+import { EXTERNAL_CONTENT_EMBED_SLICE_CHARS } from "./external-content.ts";
+import { TRANSCRIPT_EMBED_SLICE_CHARS } from "./transcripts.ts";
 
-const BLOCKS_PER_CHANNEL = 10;
-const CONCURRENCY = 8;
+const CONCURRENCY = 4;
 
 export type IngestResult = {
   user_id: number;
@@ -31,6 +30,13 @@ export type IngestResult = {
 type ChannelFetch = {
   channel: ArenaChannel;
   blocks: ArenaBlock[];
+};
+
+export type IngestDeps = {
+  getUser?: (slug: string) => Promise<ArenaUser>;
+  getAllUserChannels?: (slug: string) => Promise<ArenaChannel[]>;
+  getAllChannelBlocks?: (idOrSlug: string | number) => Promise<ArenaBlock[]>;
+  db?: Database.Database;
 };
 
 function pickRichPlain(r: { plain?: string | null; markdown?: string | null } | null | undefined) {
@@ -64,9 +70,16 @@ async function runPool<T, R>(
   return results;
 }
 
-export async function ingestUser(slug: string): Promise<IngestResult> {
-  const user: ArenaUser = await getUser(slug);
-  const channels = await getAllUserChannels(slug);
+export async function ingestUser(
+  slug: string,
+  deps: IngestDeps = {},
+): Promise<IngestResult> {
+  const fetchUser = deps.getUser ?? getUser;
+  const fetchChannels = deps.getAllUserChannels ?? getAllUserChannels;
+  const fetchChannelBlocks = deps.getAllChannelBlocks ?? getAllChannelBlocks;
+
+  const user: ArenaUser = await fetchUser(slug);
+  const channels = await fetchChannels(slug);
 
   const failed: string[] = [];
   const fetched = await runPool<ArenaChannel, ChannelFetch | null>(
@@ -74,21 +87,18 @@ export async function ingestUser(slug: string): Promise<IngestResult> {
     CONCURRENCY,
     async (c) => {
       try {
-        const res = await getChannelContents(c.slug, {
-          per: BLOCKS_PER_CHANNEL,
-        });
-        const blocks = res.data.filter(isArenaBlock);
+        const blocks = await fetchChannelBlocks(c.slug);
         return { channel: c, blocks };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`ingest: getChannelContents(${c.slug}) failed: ${msg}`);
+        console.error(`ingest: getAllChannelBlocks(${c.slug}) failed: ${msg}`);
         failed.push(c.slug);
         return null;
       }
     },
   );
 
-  const db = getDb();
+  const db = deps.db ?? getDb();
 
   const upsertUser = db.prepare(`
     INSERT INTO users (

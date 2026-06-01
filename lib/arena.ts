@@ -15,6 +15,12 @@
 
 const ARENA_BASE = "https://api.are.na";
 
+const DEFAULT_ARENA_MIN_REQUEST_INTERVAL_MS = 667;
+const MAX_429_RETRIES = 3;
+
+let arenaRequestGate: Promise<void> = Promise.resolve();
+let nextArenaRequestStartAt = 0;
+
 export type ArenaUser = {
   id: number;
   slug: string;
@@ -153,37 +159,113 @@ export function parseUserSlug(input: string): string {
   return candidate;
 }
 
+function configuredArenaMinRequestIntervalMs(): number {
+  const raw = process.env.ARENA_MIN_REQUEST_INTERVAL_MS;
+  if (!raw) return DEFAULT_ARENA_MIN_REQUEST_INTERVAL_MS;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_ARENA_MIN_REQUEST_INTERVAL_MS;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForArenaRequestSlot(): Promise<void> {
+  const previous = arenaRequestGate;
+  let release: () => void = () => {};
+  arenaRequestGate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await previous.catch(() => undefined);
+  try {
+    const interval = configuredArenaMinRequestIntervalMs();
+    const now = Date.now();
+    const waitMs = Math.max(0, nextArenaRequestStartAt - now);
+    if (waitMs > 0) await sleep(waitMs);
+    nextArenaRequestStartAt = Date.now() + interval;
+  } finally {
+    release();
+  }
+}
+
+function retryDelayMs(headers: Headers): number {
+  const retryAfter = headers.get("Retry-After");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) return Math.max(0, retryAt - Date.now());
+  }
+
+  const reset = headers.get("X-RateLimit-Reset");
+  if (reset) {
+    const epochSeconds = Number(reset);
+    if (Number.isFinite(epochSeconds)) {
+      return Math.max(0, epochSeconds * 1000 - Date.now());
+    }
+
+    const resetAt = Date.parse(reset);
+    if (Number.isFinite(resetAt)) return Math.max(0, resetAt - Date.now());
+  }
+
+  return 60_000;
+}
+
+async function arenaErrorFromResponse(
+  res: Response,
+  path: string,
+): Promise<ArenaError> {
+  let message = `Are.na ${res.status} on ${path}`;
+  let code: string | undefined;
+  // Are.na error bodies vary; try JSON first, fall back to text.
+  try {
+    const body = (await res.json()) as {
+      message?: string;
+      error?: string;
+      code?: string;
+    };
+    if (body.message) message = body.message;
+    else if (body.error) message = body.error;
+    if (body.code) code = body.code;
+  } catch {
+    try {
+      const text = await res.text();
+      if (text) message = text;
+    } catch {
+      // ignore — keep default message
+    }
+  }
+  return new ArenaError(res.status, message, code);
+}
+
 async function arenaFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Accept", "application/json");
   const token = process.env.ARENA_TOKEN;
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${ARENA_BASE}${path}`, { ...init, headers });
-  if (!res.ok) {
-    let message = `Are.na ${res.status} on ${path}`;
-    let code: string | undefined;
-    // Are.na error bodies vary; try JSON first, fall back to text.
-    try {
-      const body = (await res.json()) as {
-        message?: string;
-        error?: string;
-        code?: string;
-      };
-      if (body.message) message = body.message;
-      else if (body.error) message = body.error;
-      if (body.code) code = body.code;
-    } catch {
-      try {
-        const text = await res.text();
-        if (text) message = text;
-      } catch {
-        // ignore — keep default message
-      }
+  for (let attempt = 0; ; attempt += 1) {
+    await waitForArenaRequestSlot();
+    const res = await fetch(`${ARENA_BASE}${path}`, { ...init, headers });
+    if (res.status === 429 && attempt < MAX_429_RETRIES) {
+      const waitMs = retryDelayMs(res.headers);
+      await res.text().catch(() => undefined);
+      await sleep(waitMs);
+      continue;
     }
-    throw new ArenaError(res.status, message, code);
+    if (!res.ok) throw await arenaErrorFromResponse(res, path);
+    return (await res.json()) as T;
   }
-  return (await res.json()) as T;
+}
+
+export function resetArenaRateLimitForTest(): void {
+  arenaRequestGate = Promise.resolve();
+  nextArenaRequestStartAt = 0;
 }
 
 export function getUser(slug: string): Promise<ArenaUser> {
@@ -215,6 +297,7 @@ export async function getAllUserChannels(
     out.push(...res.data);
     if (res.data.length === 0) break;
     if (page >= res.meta.total_pages) break;
+    if (res.meta.has_more_pages === false) break;
     page += 1;
   }
   return out;
@@ -225,12 +308,38 @@ export function getChannelContents(
   opts: { page?: number; per?: number } = {},
 ): Promise<ArenaList<ArenaContentItem>> {
   const page = opts.page ?? 1;
-  const per = opts.per ?? 10;
+  const per = opts.per ?? 100;
   const key = encodeURIComponent(String(idOrSlug));
   const qs = `?page=${page}&per=${per}`;
   return arenaFetch<ArenaList<ArenaContentItem>>(
     `/v3/channels/${key}/contents${qs}`,
   );
+}
+
+export async function getAllChannelContents(
+  idOrSlug: string | number,
+): Promise<ArenaContentItem[]> {
+  const per = 100;
+  const out: ArenaContentItem[] = [];
+  let page = 1;
+
+  while (true) {
+    const res = await getChannelContents(idOrSlug, { page, per });
+    out.push(...res.data);
+    if (res.data.length === 0) break;
+    if (page >= res.meta.total_pages) break;
+    if (res.meta.has_more_pages === false) break;
+    page += 1;
+  }
+
+  return out;
+}
+
+export async function getAllChannelBlocks(
+  idOrSlug: string | number,
+): Promise<ArenaBlock[]> {
+  const contents = await getAllChannelContents(idOrSlug);
+  return contents.filter(isArenaBlock);
 }
 
 export function isArenaChannel(x: ArenaContentItem): x is ArenaChannel {

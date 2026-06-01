@@ -33,7 +33,7 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
         <BrandCard className={`${SIDEBAR_W} min-h-[72px]`} />
         <div className="flex flex-1 flex-row gap-9">
           <ProfileCard className="min-h-[72px] flex-[1]" />
-          <SyncCard className="min-h-[72px] flex-[1]" />
+          <SyncCard className="min-h-[72px] flex-[1]" ownerMode={ownerMode} />
           <SearchCard className="min-h-[72px] flex-[2.3]" />
         </div>
       </div>

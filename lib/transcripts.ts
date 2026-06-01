@@ -19,14 +19,14 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { getDb } from "@/lib/db";
+import { getDb } from "./db.ts";
 import {
   clearChunksForBlock,
   rebuildChunksForBlock,
   TRANSCRIPT_CHUNK_TYPE,
-} from "@/lib/chunks";
-import { buildSearchText } from "@/lib/search-text";
-import { parseVtt } from "@/lib/vtt";
+} from "./chunks.ts";
+import { buildSearchText } from "./search-text.ts";
+import { parseVtt } from "./vtt.ts";
 
 // Full transcript stored for debugging / future re-ranking. ~30K for a
 // 90-minute lecture; 120K headroom covers multi-hour podcast auto-subs.
