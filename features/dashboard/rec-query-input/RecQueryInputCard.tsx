@@ -32,6 +32,14 @@ export function RecQueryInputCard({
     await runRecommendation("text", { text: trimmed });
   }
 
+
+  function submitOnEnter(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  }
+
   async function recommendFromImage(file: File) {
     if (busy) return;
     if (!file.type.startsWith("image/")) {
@@ -87,6 +95,11 @@ export function RecQueryInputCard({
           onChange={(e) => setText(e.target.value)}
           placeholder={PLACEHOLDER}
           disabled={busy}
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="none"
+          enterKeyHint="search"
+          onKeyDown={submitOnEnter}
           className="min-h-0 flex-1 resize-none bg-transparent text-base leading-6 text-neutral-800 outline-none placeholder:text-black/50 disabled:opacity-60"
         />
         <div className="flex items-center justify-between gap-3">

@@ -31,6 +31,7 @@ type EvidenceBlocksHoverProps = {
 
 const POPUP_SHADOW = "0 6px 18px rgba(0,0,0,0.08)";
 
+
 type ClientPoint = {
   x: number;
   y: number;
@@ -119,39 +120,12 @@ export function EvidenceBlocksHover({
     duration: { open: 0, close: 150 },
   });
 
-  useEffect(() => {
-    if (!open) return;
-
-    const frame = requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      const origin = openingPointRef.current;
-
-      if (!panel || !origin) return;
-
-      const rect = panel.getBoundingClientRect();
-
-      panel.style.setProperty(
-        "--evidence-origin-x",
-        `${origin.x - rect.left}px`,
-      );
-      panel.style.setProperty(
-        "--evidence-origin-y",
-        `${origin.y - rect.top}px`,
-      );
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
 
 
   useEffect(() => {
     if (isMounted || open) return;
 
     openingPointRef.current = null;
-
-    const panel = panelRef.current;
-    panel?.style.removeProperty("--evidence-origin-x");
-    panel?.style.removeProperty("--evidence-origin-y");
   }, [isMounted, open]);
 
   const count = blocks.length;
@@ -191,16 +165,12 @@ export function EvidenceBlocksHover({
               className={cn(
                 "flex max-h-[400px] w-[200px] flex-col overflow-hidden rounded-[1px] border border-black/10",
                 "bg-dashboard bg-[image:var(--gradient-panel)] font-sans text-black",
-                "transition-[opacity,transform] duration-0 ease-[var(--ease-out-quad)]",
-                "will-change-[transform,opacity] transform-gpu",
-                "data-[status=close]:scale-[0.98] data-[status=close]:opacity-0 data-[status=close]:duration-150",
+                "transition-opacity duration-0 ease-[var(--ease-out-quad)]",
+                "will-change-[opacity]",
+                "data-[status=close]:opacity-0 data-[status=close]:duration-150",
                 "motion-reduce:transition-none",
               )}
-              style={{
-                boxShadow: POPUP_SHADOW,
-                transformOrigin:
-                  "var(--evidence-origin-x, 50%) var(--evidence-origin-y, 50%)",
-              }}
+              style={{ boxShadow: POPUP_SHADOW }}
             >
               <div className="shrink-0 border-b border-black/10 px-3 py-2 font-[Arial] text-[16px] font-bold text-neutral-800">
                 Evidence blocks
