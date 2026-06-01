@@ -1,5 +1,11 @@
 import type Database from "better-sqlite3";
 import { getDb } from "./db.ts";
+import { EMBEDDING_MODEL } from "./embeddings.ts";
+import {
+  blockEmbeddingInput,
+  hashEmbeddingInput,
+  isEmbeddingFresh,
+} from "./embedding-freshness.ts";
 
 export type DevStatusProfile = {
   username: string | null;
@@ -59,8 +65,50 @@ type CountRow = {
   chunk_embeddings: number;
 };
 
+type EmbeddableBlockRow = {
+  search_text: string;
+  vector_block_id: number | null;
+  input_hash: string | null;
+  embedding_model: string | null;
+};
+
 function countNonEmpty(column: string): string {
   return `COALESCE(SUM(CASE WHEN ${column} IS NOT NULL AND trim(${column}) <> '' THEN 1 ELSE 0 END), 0)`;
+}
+
+function countMissingOrStaleBlockEmbeddings(db: Database.Database): number {
+  const rows = db
+    .prepare(
+      `SELECT b.search_text,
+              v.block_id AS vector_block_id,
+              m.input_hash,
+              m.embedding_model
+         FROM blocks b
+         LEFT JOIN vec_blocks v ON v.block_id = b.id
+         LEFT JOIN block_embedding_meta m ON m.block_id = b.id
+        WHERE b.search_text IS NOT NULL
+          AND trim(b.search_text) <> ''`,
+    )
+    .all() as EmbeddableBlockRow[];
+
+  let count = 0;
+  for (const row of rows) {
+    const inputHash = hashEmbeddingInput(blockEmbeddingInput(row.search_text));
+    if (
+      !isEmbeddingFresh(
+        {
+          hasVector: row.vector_block_id !== null,
+          input_hash: row.input_hash,
+          embedding_model: row.embedding_model,
+        },
+        inputHash,
+        EMBEDDING_MODEL,
+      )
+    ) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 export function getDevStatus(db: Database.Database = getDb()): DevStatusResponse {
@@ -93,15 +141,7 @@ export function getDevStatus(db: Database.Database = getDb()): DevStatusResponse
         (SELECT COUNT(*)
            FROM blocks
           WHERE search_text IS NOT NULL AND trim(search_text) <> '') AS embeddable_blocks,
-        (SELECT COUNT(*)
-           FROM blocks b
-          WHERE b.search_text IS NOT NULL
-            AND trim(b.search_text) <> ''
-            AND NOT EXISTS (
-              SELECT 1
-                FROM vec_blocks v
-               WHERE v.block_id = b.id
-            )) AS missing_embeddings,
+        0 AS missing_embeddings,
         (SELECT COUNT(*) FROM block_ocr) AS ocr_rows,
         (SELECT ${countNonEmpty("ocr_error")} FROM block_ocr) AS ocr_errors,
         (SELECT COUNT(*) FROM block_link_content) AS external_content_rows,
@@ -125,7 +165,10 @@ export function getDevStatus(db: Database.Database = getDb()): DevStatusResponse
   return {
     profile: profile ?? null,
     last_sync: lastSync ?? null,
-    counts,
+    counts: {
+      ...counts,
+      missing_embeddings: countMissingOrStaleBlockEmbeddings(db),
+    },
     logs,
   };
 }

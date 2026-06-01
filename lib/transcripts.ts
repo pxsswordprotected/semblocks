@@ -259,7 +259,11 @@ export async function extractPendingTranscripts(
       }
     ).c;
     db.exec(
-      `DELETE FROM vec_block_chunks
+      `DELETE FROM chunk_embedding_meta
+         WHERE chunk_id IN (
+           SELECT id FROM block_chunks WHERE chunk_type = 'transcript'
+         );
+       DELETE FROM vec_block_chunks
          WHERE chunk_id IN (
            SELECT id FROM block_chunks WHERE chunk_type = 'transcript'
          );
@@ -353,6 +357,9 @@ export async function extractPendingTranscripts(
   const invalidateBlockVector = db.prepare(
     `DELETE FROM vec_blocks WHERE block_id = ?`,
   );
+  const invalidateBlockMeta = db.prepare(
+    `DELETE FROM block_embedding_meta WHERE block_id = ?`,
+  );
 
   let processed = 0;
   let errors = 0;
@@ -444,6 +451,7 @@ export async function extractPendingTranscripts(
             });
             updateSearchText.run(newSearchText, item.id);
             invalidateBlockVector.run(item.id);
+            invalidateBlockMeta.run(item.id);
           }
         })();
         processed += 1;

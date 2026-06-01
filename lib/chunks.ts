@@ -1,6 +1,10 @@
 import Database from "better-sqlite3";
-import { getDb } from "@/lib/db";
-import { EMBEDDING_MODEL, embedMany } from "@/lib/embeddings";
+import { getDb } from "./db.ts";
+import { EMBEDDING_MODEL, embedMany } from "./embeddings.ts";
+import {
+  hashEmbeddingInput,
+  isEmbeddingFresh,
+} from "./embedding-freshness.ts";
 
 export const LINK_CHUNK_MIN_CHARS = 8000;
 export const LINK_CHUNK_MAX_CHARS = 3000;
@@ -25,8 +29,16 @@ type Chunk = {
   source_end_char: number;
 };
 
-type PendingChunk = { id: number; text: string };
+type CandidateChunk = {
+  id: number;
+  text: string;
+  vector_chunk_id: number | null;
+  input_hash: string | null;
+  embedding_model: string | null;
+};
+type PendingChunk = { id: number; text: string; input_hash: string };
 type LinkContentRow = { block_id: number; content_text: string };
+type EmbedMany = (inputs: string[]) => Promise<Float32Array[]>;
 
 type ChunkOptions = {
   minChars?: number;
@@ -95,11 +107,18 @@ export function chunkText(
   return chunks;
 }
 
-function deleteChunkVectorsForBlock(
+function deleteChunkEmbeddingsForBlock(
   db: Database.Database,
   blockId: number,
   chunkType: string,
 ): void {
+  db.prepare(
+    `DELETE FROM chunk_embedding_meta
+      WHERE chunk_id IN (
+        SELECT id FROM block_chunks
+         WHERE block_id = ? AND chunk_type = ?
+      )`,
+  ).run(blockId, chunkType);
   db.prepare(
     `DELETE FROM vec_block_chunks
       WHERE chunk_id IN (
@@ -114,7 +133,7 @@ export function clearChunksForBlock(
   blockId: number,
   chunkType: string,
 ): void {
-  deleteChunkVectorsForBlock(db, blockId, chunkType);
+  deleteChunkEmbeddingsForBlock(db, blockId, chunkType);
   db.prepare(
     `DELETE FROM block_chunks WHERE block_id = ? AND chunk_type = ?`,
   ).run(blockId, chunkType);
@@ -191,6 +210,12 @@ function rebuildAllLinkChunks(db: Database.Database): { chunked: number; cleared
 
   db.transaction(() => {
     db.prepare(
+      `DELETE FROM chunk_embedding_meta
+        WHERE chunk_id IN (
+          SELECT id FROM block_chunks WHERE chunk_type = ?
+        )`,
+    ).run(EXTERNAL_CONTENT_CHUNK_TYPE);
+    db.prepare(
       `DELETE FROM vec_block_chunks
         WHERE chunk_id IN (
           SELECT id FROM block_chunks WHERE chunk_type = ?
@@ -246,6 +271,12 @@ function rebuildAllTranscriptChunks(
 
   db.transaction(() => {
     db.prepare(
+      `DELETE FROM chunk_embedding_meta
+        WHERE chunk_id IN (
+          SELECT id FROM block_chunks WHERE chunk_type = ?
+        )`,
+    ).run(TRANSCRIPT_CHUNK_TYPE);
+    db.prepare(
       `DELETE FROM vec_block_chunks
         WHERE chunk_id IN (
           SELECT id FROM block_chunks WHERE chunk_type = ?
@@ -259,36 +290,79 @@ function rebuildAllTranscriptChunks(
   return { chunked: rebuildMissingTranscriptChunks(db), cleared: existing.c };
 }
 
-async function embedPendingChunks(db: Database.Database): Promise<{
+export async function embedPendingChunks(
+  db: Database.Database,
+  opts: { embedMany?: EmbedMany; embeddingModel?: string } = {},
+): Promise<{
   embedded: number;
   skipped: number;
   batches: number;
 }> {
-  const pending = db
+  const embedManyFn = opts.embedMany ?? embedMany;
+  const embeddingModel = opts.embeddingModel ?? EMBEDDING_MODEL;
+  const candidates = db
     .prepare(
-      `SELECT c.id, c.text
+      `SELECT c.id,
+              c.text,
+              v.chunk_id AS vector_chunk_id,
+              m.input_hash,
+              m.embedding_model
          FROM block_chunks c
          LEFT JOIN vec_block_chunks v ON v.chunk_id = c.id
-        WHERE v.chunk_id IS NULL
-          AND length(trim(c.text)) > 0
+         LEFT JOIN chunk_embedding_meta m ON m.chunk_id = c.id
+        WHERE length(trim(c.text)) > 0
         ORDER BY c.id`,
     )
-    .all() as PendingChunk[];
+    .all() as CandidateChunk[];
+
+  const pending: PendingChunk[] = [];
+  for (const row of candidates) {
+    const inputHash = hashEmbeddingInput(row.text);
+    if (
+      isEmbeddingFresh(
+        {
+          hasVector: row.vector_chunk_id !== null,
+          input_hash: row.input_hash,
+          embedding_model: row.embedding_model,
+        },
+        inputHash,
+        embeddingModel,
+      )
+    ) {
+      continue;
+    }
+    pending.push({ id: row.id, text: row.text, input_hash: inputHash });
+  }
 
   if (pending.length === 0) return { embedded: 0, skipped: 0, batches: 0 };
 
-  const insert = db.prepare(
+  const deleteVector = db.prepare(`DELETE FROM vec_block_chunks WHERE chunk_id = ?`);
+  const insertVector = db.prepare(
     `INSERT INTO vec_block_chunks (chunk_id, embedding, embedding_model, created_at)
      VALUES (?, ?, ?, datetime('now'))`,
+  );
+  const upsertMeta = db.prepare(
+    `INSERT INTO chunk_embedding_meta (
+       chunk_id, input_hash, embedding_model, embedded_at, input_chars
+     ) VALUES (?, ?, ?, datetime('now'), ?)
+     ON CONFLICT(chunk_id) DO UPDATE SET
+       input_hash = excluded.input_hash,
+       embedding_model = excluded.embedding_model,
+       embedded_at = excluded.embedded_at,
+       input_chars = excluded.input_chars`,
   );
   const writeBatch = db.transaction(
     (rows: PendingChunk[], vectors: Float32Array[]) => {
       for (let i = 0; i < rows.length; i++) {
-        insert.run(
-          BigInt(rows[i].id),
-          Buffer.from(vectors[i].buffer),
-          EMBEDDING_MODEL,
+        const row = rows[i];
+        const vector = vectors[i];
+        deleteVector.run(row.id);
+        insertVector.run(
+          BigInt(row.id),
+          Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength),
+          embeddingModel,
         );
+        upsertMeta.run(row.id, row.input_hash, embeddingModel, row.text.length);
       }
     },
   );
@@ -299,7 +373,7 @@ async function embedPendingChunks(db: Database.Database): Promise<{
 
   for (let i = 0; i < pending.length; i += BATCH_SIZE) {
     const slice = pending.slice(i, i + BATCH_SIZE);
-    const vectors = await embedMany(slice.map((r) => r.text));
+    const vectors = await embedManyFn(slice.map((r) => r.text));
     if (vectors.length !== slice.length) {
       skipped += slice.length - vectors.length;
     }
@@ -312,16 +386,24 @@ async function embedPendingChunks(db: Database.Database): Promise<{
 }
 
 export async function processChunks(
-  opts: { rebuild?: boolean } = {},
+  opts: {
+    rebuild?: boolean;
+    db?: Database.Database;
+    embedMany?: EmbedMany;
+    embeddingModel?: string;
+  } = {},
 ): Promise<ChunkResult> {
-  const db = getDb();
+  const db = opts.db ?? getDb();
   const ext = opts.rebuild
     ? rebuildAllLinkChunks(db)
     : { chunked: rebuildMissingLinkChunks(db), cleared: 0 };
   const tx = opts.rebuild
     ? rebuildAllTranscriptChunks(db)
     : { chunked: rebuildMissingTranscriptChunks(db), cleared: 0 };
-  const embedded = await embedPendingChunks(db);
+  const embedded = await embedPendingChunks(db, {
+    embedMany: opts.embedMany,
+    embeddingModel: opts.embeddingModel,
+  });
   return {
     chunked: ext.chunked + tx.chunked,
     embedded: embedded.embedded,

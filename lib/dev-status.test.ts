@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 
 import { getDevStatus } from "./dev-status.ts";
+import { blockEmbeddingInput, hashEmbeddingInput } from "./embedding-freshness.ts";
 
 function createDevStatusDb(): Database.Database {
   const db = new Database(":memory:");
@@ -22,6 +23,13 @@ function createDevStatusDb(): Database.Database {
       block_id INTEGER PRIMARY KEY,
       embedding_model TEXT,
       created_at TEXT
+    );
+    CREATE TABLE block_embedding_meta (
+      block_id INTEGER PRIMARY KEY,
+      input_hash TEXT NOT NULL,
+      embedding_model TEXT NOT NULL,
+      embedded_at TEXT NOT NULL,
+      input_chars INTEGER NOT NULL CHECK (input_chars >= 0)
     );
     CREATE TABLE sync_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,9 +83,11 @@ test("summarizes profile, counts, missing embeddings, and logs", () => {
         (2, 'needs embedding'),
         (3, ''),
         (4, '   '),
-        (5, NULL);
-      INSERT INTO vec_blocks (block_id, embedding_model, created_at)
-        VALUES (1, 'text-embedding-3-small', '2025-05-27T14:33:00Z');
+        (5, NULL),
+        (6, 'stale block');
+      INSERT INTO vec_blocks (block_id, embedding_model, created_at) VALUES
+        (1, 'text-embedding-3-small', '2025-05-27T14:33:00Z'),
+        (6, 'text-embedding-3-small', '2025-05-27T14:33:00Z');
 
       INSERT INTO block_ocr (block_id, ocr_error) VALUES
         (1, NULL),
@@ -102,6 +112,17 @@ test("summarizes profile, counts, missing embeddings, and logs", () => {
         ('error', 'first failed', '2025-05-27T14:30:00Z'),
         ('ok', 'finished', '2025-05-27T14:35:00Z');
     `);
+    const firstInput = blockEmbeddingInput("first indexed block");
+    db.prepare(
+      `INSERT INTO block_embedding_meta (
+        block_id, input_hash, embedding_model, embedded_at, input_chars
+      ) VALUES (?, ?, 'text-embedding-3-small', '2025-05-27T14:33:00Z', ?)`,
+    ).run(1, hashEmbeddingInput(firstInput), firstInput.length);
+    db.prepare(
+      `INSERT INTO block_embedding_meta (
+        block_id, input_hash, embedding_model, embedded_at, input_chars
+      ) VALUES (6, ?, 'text-embedding-3-small', '2025-05-27T14:33:00Z', ?)`,
+    ).run(hashEmbeddingInput("old stale block"), "old stale block".length);
 
     const status = getDevStatus(db);
 
@@ -117,10 +138,10 @@ test("summarizes profile, counts, missing embeddings, and logs", () => {
     });
     assert.deepEqual(status.counts, {
       channels: 2,
-      blocks: 5,
-      embeddings: 1,
-      embeddable_blocks: 2,
-      missing_embeddings: 1,
+      blocks: 6,
+      embeddings: 2,
+      embeddable_blocks: 3,
+      missing_embeddings: 2,
       ocr_rows: 3,
       ocr_errors: 1,
       external_content_rows: 2,

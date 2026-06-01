@@ -250,7 +250,14 @@ export async function extractPendingExternalContent(
       )
       .get() as { c: number }).c;
     db.exec(
-      `DELETE FROM vec_block_chunks
+      `DELETE FROM chunk_embedding_meta
+         WHERE chunk_id IN (
+           SELECT bc.id
+             FROM block_chunks bc
+             JOIN blocks b ON b.id = bc.block_id
+            WHERE b.block_type IN ('Link', 'Attachment')
+         );
+       DELETE FROM vec_block_chunks
          WHERE chunk_id IN (
            SELECT bc.id
              FROM block_chunks bc
@@ -346,6 +353,9 @@ export async function extractPendingExternalContent(
   );
   const invalidateBlockVector = db.prepare(
     `DELETE FROM vec_blocks WHERE block_id = ?`,
+  );
+  const invalidateBlockMeta = db.prepare(
+    `DELETE FROM block_embedding_meta WHERE block_id = ?`,
   );
 
   let processed = 0;
@@ -463,11 +473,11 @@ export async function extractPendingExternalContent(
               channel_titles: channelTitles,
             });
             updateSearchText.run(newSearchText, item.row.id);
-            // The block's existing vec_blocks row was embedded from the
-            // pre-fetch search_text (often just the filename). Drop it so
-            // the next embedPendingBlocks run re-embeds from the now-
-            // fattened search_text.
+            // Keep vector and freshness metadata consistent after changing
+            // search_text; the hash check would also catch this on the next
+            // embed pass.
             invalidateBlockVector.run(item.row.id);
+            invalidateBlockMeta.run(item.row.id);
           }
         })();
         processed += 1;

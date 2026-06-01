@@ -30,6 +30,105 @@ export function getDb(): Database.Database {
         )
         .get(name),
     );
+  const tableSql = (name: string): string | null =>
+    (
+      db
+        .prepare(
+          `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`,
+        )
+        .get(name) as { sql: string } | undefined
+    )?.sql ?? null;
+
+  const assertForeignKeyCheck = () => {
+    const violations = db.pragma("foreign_key_check") as unknown[];
+    if (violations.length > 0) {
+      throw new Error("SQLite foreign key check failed after migration");
+    }
+  };
+
+  const migrateBlockChunksChecks = () => {
+    const sql = tableSql("block_chunks");
+    if (
+      !sql ||
+      (sql.includes("CHECK (chunk_index >= 0)") &&
+        sql.includes("CHECK (source_start_char >= 0)") &&
+        sql.includes("CHECK (source_end_char >= source_start_char)"))
+    ) {
+      return;
+    }
+
+    const tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE block_chunks_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            block_id INTEGER NOT NULL,
+            chunk_type TEXT NOT NULL,
+            chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+            text TEXT NOT NULL,
+            source_start_char INTEGER NOT NULL CHECK (source_start_char >= 0),
+            source_end_char INTEGER NOT NULL CHECK (source_end_char >= source_start_char),
+            created_at TEXT,
+            FOREIGN KEY (block_id) REFERENCES blocks(id),
+            UNIQUE(block_id, chunk_type, chunk_index)
+        );
+        INSERT INTO block_chunks_new (
+            id, block_id, chunk_type, chunk_index, text,
+            source_start_char, source_end_char, created_at
+        )
+        SELECT id, block_id, chunk_type, chunk_index, text,
+               source_start_char, source_end_char, created_at
+          FROM block_chunks;
+        DROP TABLE block_chunks;
+        ALTER TABLE block_chunks_new RENAME TO block_chunks;
+      `);
+    });
+
+    db.pragma("foreign_keys = OFF");
+    try {
+      tx();
+    } finally {
+      db.pragma("foreign_keys = ON");
+    }
+    assertForeignKeyCheck();
+  };
+
+  const migrateEmbeddingMetaChecks = (
+    tableName: "block_embedding_meta" | "chunk_embedding_meta",
+    keyColumn: "block_id" | "chunk_id",
+    foreignTable: "blocks" | "block_chunks",
+  ) => {
+    const sql = tableSql(tableName);
+    if (!sql || sql.includes("CHECK (input_chars >= 0)")) return;
+
+    const nextTable = `${tableName}_new`;
+    const tx = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE ${nextTable} (
+            ${keyColumn} INTEGER PRIMARY KEY,
+            input_hash TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedded_at TEXT NOT NULL,
+            input_chars INTEGER NOT NULL CHECK (input_chars >= 0),
+            FOREIGN KEY (${keyColumn}) REFERENCES ${foreignTable}(id)
+        );
+        INSERT INTO ${nextTable} (
+            ${keyColumn}, input_hash, embedding_model, embedded_at, input_chars
+        )
+        SELECT ${keyColumn}, input_hash, embedding_model, embedded_at, input_chars
+          FROM ${tableName};
+        DROP TABLE ${tableName};
+        ALTER TABLE ${nextTable} RENAME TO ${tableName};
+      `);
+    });
+
+    db.pragma("foreign_keys = OFF");
+    try {
+      tx();
+    } finally {
+      db.pragma("foreign_keys = ON");
+    }
+    assertForeignKeyCheck();
+  };
 
   if (!hasTable("users")) {
     const schemaPath = path.join(process.cwd(), "data", "schema.sql");
@@ -89,10 +188,10 @@ export function getDb(): Database.Database {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             block_id INTEGER NOT NULL,
             chunk_type TEXT NOT NULL,
-            chunk_index INTEGER NOT NULL,
+            chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
             text TEXT NOT NULL,
-            source_start_char INTEGER NOT NULL,
-            source_end_char INTEGER NOT NULL,
+            source_start_char INTEGER NOT NULL CHECK (source_start_char >= 0),
+            source_end_char INTEGER NOT NULL CHECK (source_end_char >= source_start_char),
             created_at TEXT,
             FOREIGN KEY (block_id) REFERENCES blocks(id),
             UNIQUE(block_id, chunk_type, chunk_index)
@@ -109,6 +208,35 @@ export function getDb(): Database.Database {
         );
       `);
     }
+
+    if (!hasTable("block_embedding_meta")) {
+      db.exec(`
+        CREATE TABLE block_embedding_meta (
+            block_id INTEGER PRIMARY KEY,
+            input_hash TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedded_at TEXT NOT NULL,
+            input_chars INTEGER NOT NULL CHECK (input_chars >= 0),
+            FOREIGN KEY (block_id) REFERENCES blocks(id)
+        );
+      `);
+    }
+    if (!hasTable("chunk_embedding_meta")) {
+      db.exec(`
+        CREATE TABLE chunk_embedding_meta (
+            chunk_id INTEGER PRIMARY KEY,
+            input_hash TEXT NOT NULL,
+            embedding_model TEXT NOT NULL,
+            embedded_at TEXT NOT NULL,
+            input_chars INTEGER NOT NULL CHECK (input_chars >= 0),
+            FOREIGN KEY (chunk_id) REFERENCES block_chunks(id)
+        );
+      `);
+    }
+
+    migrateBlockChunksChecks();
+    migrateEmbeddingMetaChecks("block_embedding_meta", "block_id", "blocks");
+    migrateEmbeddingMetaChecks("chunk_embedding_meta", "chunk_id", "block_chunks");
 
     // One-time chunk_type tag rename: link_content → external_content.
     // Idempotent — re-running is a no-op once the rows are renamed.

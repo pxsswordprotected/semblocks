@@ -58,6 +58,15 @@ embedding float[1536], --a fixed length array of 1536 32-bit floats
 +embedding_model TEXT,
 +created_at TEXT
 );
+CREATE TABLE block_embedding_meta (
+    block_id INTEGER PRIMARY KEY,
+    input_hash TEXT NOT NULL,
+    embedding_model TEXT NOT NULL,
+    embedded_at TEXT NOT NULL,
+    input_chars INTEGER NOT NULL CHECK (input_chars >= 0),
+    FOREIGN KEY (block_id) REFERENCES blocks(id)
+);
+
 
 CREATE TABLE sync_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,10 +118,10 @@ CREATE TABLE block_chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     block_id INTEGER NOT NULL,
     chunk_type TEXT NOT NULL,
-    chunk_index INTEGER NOT NULL,
+    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
     text TEXT NOT NULL,
-    source_start_char INTEGER NOT NULL,
-    source_end_char INTEGER NOT NULL,
+    source_start_char INTEGER NOT NULL CHECK (source_start_char >= 0),
+    source_end_char INTEGER NOT NULL CHECK (source_end_char >= source_start_char),
     created_at TEXT,
     FOREIGN KEY (block_id) REFERENCES blocks(id),
     UNIQUE(block_id, chunk_type, chunk_index)
@@ -124,4 +133,13 @@ CREATE VIRTUAL TABLE vec_block_chunks USING vec0(
     +embedding_model TEXT,
     +created_at TEXT
 );
+CREATE TABLE chunk_embedding_meta (
+    chunk_id INTEGER PRIMARY KEY,
+    input_hash TEXT NOT NULL,
+    embedding_model TEXT NOT NULL,
+    embedded_at TEXT NOT NULL,
+    input_chars INTEGER NOT NULL CHECK (input_chars >= 0),
+    FOREIGN KEY (chunk_id) REFERENCES block_chunks(id)
+);
+
 
