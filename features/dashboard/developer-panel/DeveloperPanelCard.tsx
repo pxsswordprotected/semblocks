@@ -155,7 +155,7 @@ export function DeveloperPanelCard({
     if (!ingestUser) return;
     void runAction("pipeline", "Run full pipeline", [
       ingestEndpoint(ingestUser),
-      "/api/ocr",
+      "/api/ocr?limit=500",
       "/api/external-content",
       "/api/transcripts",
       "/api/chunks",
@@ -195,7 +195,7 @@ export function DeveloperPanelCard({
             onRunPipeline={runPipeline}
             onRunSync={runSync}
             onRunEmbed={() => void runAction("embed", "Embed missing", ["/api/embed"])}
-            onRunOcr={() => void runAction("ocr", "OCR images", ["/api/ocr"])}
+            onRunOcr={() => void runAction("ocr", "OCR images", ["/api/ocr?limit=500"])}
             onRunExternalContent={() =>
               void runAction("external-content", "Read content", [
                 "/api/external-content",

@@ -21,10 +21,10 @@ import {
   visionCaption,
 } from "./vision.ts";
 
-// OpenAI tier-1 cap on gpt-4o-mini is 20,000 TPM. A single high-detail
-// vision call is ~1500 input + ~500 output tokens, so we serialize and
-// rely on the SDK's built-in 429 backoff to space requests out.
-const CONCURRENCY = 1;
+// OpenAI vision requests are paced by start time and allowed to overlap.
+// This keeps throughput high when individual calls are slow while still
+// bounding TPM pressure. Tune with OCR_CONCURRENCY and OCR_MIN_CALL_GAP_MS.
+const DEFAULT_CONCURRENCY = 3;
 
 export type OcrResult = {
   processed: number;
@@ -57,11 +57,53 @@ async function runPool<T>(
   await Promise.all(runners);
 }
 
-// Minimum gap between OpenAI calls to stay under the TPM cap. With
-// ~3000 tokens per high-detail image, 4s/call keeps us under ~45k TPM,
-// well below any tier-1 ceiling. Tune up if throughput becomes urgent.
-const MIN_CALL_GAP_MS = 4000;
+// Minimum gap between OpenAI vision calls. Keep calls serialized, but make
+// the gap configurable because account TPM limits vary; 1s is conservative
+// for the current gpt-4o-mini vision requests and 429s are retried below.
+const DEFAULT_MIN_CALL_GAP_MS = 1000;
 const MAX_RATE_LIMIT_RETRIES = 6;
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function ocrConcurrency(): number {
+  return envInt("OCR_CONCURRENCY", DEFAULT_CONCURRENCY);
+}
+
+function minCallGapMs(): number {
+  const raw = process.env.OCR_MIN_CALL_GAP_MS;
+  if (!raw) return DEFAULT_MIN_CALL_GAP_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_MIN_CALL_GAP_MS;
+}
+
+function createStartPacer(minGapMs: number): () => Promise<void> {
+  let gate: Promise<void> = Promise.resolve();
+  let nextStartAt = 0;
+
+  return async () => {
+    const previous = gate;
+    let release: () => void = () => {};
+    gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    await previous.catch(() => undefined);
+    try {
+      const wait = Math.max(0, nextStartAt - Date.now());
+      if (wait > 0) await sleep(wait);
+      nextStartAt = Date.now() + minGapMs;
+    } finally {
+      release();
+    }
+  };
+}
 
 
 function sleep(ms: number): Promise<void> {
@@ -188,10 +230,14 @@ export async function ocrPendingImages(
   let errors = 0;
   let completed = 0;
 
-  let lastCallEndedAt = 0;
-  await runPool(pending, CONCURRENCY, async (row) => {
-    const wait = MIN_CALL_GAP_MS - (Date.now() - lastCallEndedAt);
-    if (wait > 0) await sleep(wait);
+  const concurrency = ocrConcurrency();
+  const minGapMs = minCallGapMs();
+  const waitForStartSlot = createStartPacer(minGapMs);
+  console.log(
+    `[sync:ocr] config concurrency=${concurrency} min_start_gap_ms=${minGapMs}`,
+  );
+  await runPool(pending, concurrency, async (row) => {
+    await waitForStartSlot();
     const url =
       row.image_display_url && row.image_display_url.trim()
         ? row.image_display_url
@@ -252,7 +298,7 @@ export async function ocrPendingImages(
       console.error(`ocr: block ${row.id} (${url}) failed: ${message}`);
       errors += 1;
     } finally {
-      lastCallEndedAt = Date.now();
+      // Pacing is by request start time, not completion time.
       completed += 1;
       if (completed === pending.length || completed % 10 === 0) {
         console.log(
