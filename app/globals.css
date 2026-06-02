@@ -40,3 +40,17 @@
 
   --ease-out-quad: cubic-bezier(.25, .46, .45, .94);
 }
+
+.dashboard-viewport-fallback {
+  display: none;
+}
+
+@media (max-width: 1200px), (max-height: 760px) {
+  .dashboard-viewport-content {
+    display: none;
+  }
+
+  .dashboard-viewport-fallback {
+    display: flex;
+  }
+}

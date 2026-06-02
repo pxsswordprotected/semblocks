@@ -1,4 +1,5 @@
 import { Dashboard } from "@/features/dashboard/Dashboard";
+import { DashboardViewportGate } from "@/features/dashboard/DashboardViewportGate";
 import { isAdmin, isAdminConfigured } from "@/lib/admin-auth";
 
 type DevPageProps = {
@@ -22,7 +23,9 @@ export default async function DevPage({ searchParams }: DevPageProps) {
             Log out
           </button>
         </form>
-        <Dashboard ownerMode />
+        <DashboardViewportGate>
+          <Dashboard ownerMode />
+        </DashboardViewportGate>
       </>
     );
   }
