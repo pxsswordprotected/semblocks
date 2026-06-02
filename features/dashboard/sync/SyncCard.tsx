@@ -105,13 +105,13 @@ export function SyncCard({
         type="button"
         disabled={disabled}
         onClick={syncProfile}
-        className="flex h-full w-full flex-col justify-center items-center gap-1.5 px-4 text-left disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-full w-full min-w-0 flex-col justify-center items-center gap-1.5 overflow-hidden px-4 text-left disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <span className="flex items-center gap-1.5 text-[16px] text-neutral-800">
-          <ArrowsClockwise size={26} />
+        <span className="flex max-w-full items-center gap-1.5 whitespace-nowrap text-[16px] text-neutral-800">
+          <ArrowsClockwise size={26} className="shrink-0" />
           {running ? "Syncing…" : "Sync new blocks"}
         </span>
-        <span className="text-sm text-black/50">
+        <span className="block max-w-full truncate text-sm text-black/50">
           {ownerMode
             ? `Current profile: ${PROFILE_USERNAME}`
             : "Sync available in owner mode"}
@@ -145,28 +145,28 @@ function SyncSummary({ status }: { status: SyncStatus }) {
   if (status.state === "idle") return null;
   if (status.state === "running") {
     return (
-      <span className="text-center text-xs leading-snug text-black/50">
+      <span className="block max-w-full truncate text-center text-xs leading-snug text-black/50">
         {progressText(status.job)}
       </span>
     );
   }
   if (status.state === "error") {
-    return <span className="text-xs text-red-600">{status.message}</span>;
+    return <span className="block max-w-full truncate text-xs text-red-600">{status.message}</span>;
   }
   if (status.state === "cancelled") {
-    return <span className="text-xs text-black/50">Sync cancelled.</span>;
+    return <span className="block max-w-full truncate text-xs text-black/50">Sync cancelled.</span>;
   }
 
   const r = status.result;
   if (!r) {
     return (
-      <span className="text-center text-xs leading-snug text-black/60">
+      <span className="block max-w-full truncate text-center text-xs leading-snug text-black/60">
         {status.job.message ?? "Sync complete."}
       </span>
     );
   }
   return (
-    <span className="text-center text-xs leading-snug text-black/60">
+    <span className="block max-w-full truncate text-center text-xs leading-snug text-black/60">
       Saved {r.ingest.channel_count} channels, {r.ingest.block_count} blocks,{" "}
       {r.ingest.link_count} links · OCR {r.ocr.processed}/{r.ocr.errors} ·
       Content {r.external_content.processed}/{r.external_content.errors}/

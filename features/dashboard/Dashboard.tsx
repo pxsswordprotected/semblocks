@@ -6,7 +6,13 @@ import { BrandCard } from "@/features/dashboard/brand/BrandCard";
 import { ChannelsCard } from "@/features/dashboard/channels/ChannelsCard";
 import type { ChannelSummary } from "@/features/dashboard/channels/types";
 import { DeveloperPanelCard } from "@/features/dashboard/developer-panel/DeveloperPanelCard";
-import { SIDEBAR_W } from "@/features/dashboard/layout";
+import {
+  DASHBOARD_GAP,
+  DASHBOARD_PRIMARY_PANEL_H,
+  DASHBOARD_TOP_CARD_GAP,
+  DASHBOARD_TOP_H,
+  SIDEBAR_W,
+} from "@/features/dashboard/layout";
 import { ProfileCard } from "@/features/dashboard/profile/ProfileCard";
 import { RankingTableCard } from "@/features/dashboard/ranking-table/RankingTableCard";
 import { RecQueryInputCard } from "@/features/dashboard/rec-query-input/RecQueryInputCard";
@@ -27,32 +33,34 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
   }, []);
 
   return (
-    <main className="flex h-screen min-h-0 flex-col gap-12 overflow-hidden p-page">
+    <main
+      className={`flex h-screen min-h-0 flex-col overflow-hidden p-[clamp(1rem,2vw,2rem)] ${DASHBOARD_GAP}`}
+    >
       {/* TOP BAR */}
-      <div className="flex shrink-0 flex-row gap-12">
-        <BrandCard className={`${SIDEBAR_W} min-h-[72px]`} />
-        <div className="flex flex-1 flex-row gap-9">
-          <ProfileCard className="min-h-[72px] flex-[1]" />
-          <SyncCard className="min-h-[72px] flex-[1]" ownerMode={ownerMode} />
-          <SearchCard className="min-h-[72px] flex-[2.3]" />
+      <div className={`flex shrink-0 flex-row ${DASHBOARD_GAP}`}>
+        <BrandCard className={`${SIDEBAR_W} ${DASHBOARD_TOP_H} shrink-0`} />
+        <div className={`flex min-w-0 flex-1 flex-row ${DASHBOARD_TOP_CARD_GAP}`}>
+          <ProfileCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} />
+          <SyncCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} ownerMode={ownerMode} />
+          <SearchCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[2.3]`} />
         </div>
       </div>
 
       {/* BODY — flex-1 so the bottom row reaches the 32px page margin. */}
-      <div className="flex min-h-0 flex-1 flex-row gap-12">
+      <div className={`flex min-h-0 flex-1 flex-row ${DASHBOARD_GAP}`}>
         {/* LEFT SIDEBAR */}
-        <div className={`flex min-h-0 flex-col gap-12 ${SIDEBAR_W}`}>
+        <div className={`flex min-h-0 flex-col ${DASHBOARD_GAP} ${SIDEBAR_W}`}>
           <ChannelsCard
-            className="h-[520px] shrink-0"
+            className={`${DASHBOARD_PRIMARY_PANEL_H} shrink-0`}
             onSelectionChange={onChannelSelectionChange}
           />
-          <DeveloperPanelCard className="flex-1" ownerMode={ownerMode} />
+          <DeveloperPanelCard className="min-h-0 flex-1" ownerMode={ownerMode} />
         </div>
 
         {/* MAIN CONTENT */}
-        <div className="flex min-h-0 flex-1 flex-col gap-12">
+        <div className={`flex min-h-0 flex-1 flex-col ${DASHBOARD_GAP}`}>
           <BlocksTableCard
-            className="h-[520px] w-full shrink-0"
+            className={`${DASHBOARD_PRIMARY_PANEL_H} w-full shrink-0`}
             selectedChannels={selectedChannels}
           />
           <div className="flex min-h-0 w-full flex-1 flex-row">
