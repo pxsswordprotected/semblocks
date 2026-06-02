@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 
 import {
+  abandonStaleActiveJobs,
   appendJobEvent,
   createJob,
   getJob,
@@ -86,7 +87,12 @@ test("completed jobs release dedupe key for future work", () => {
 test("job status helpers update progress, events, cancel and failure", () => {
   const db = createJobsDb();
   try {
-    const { job } = createJob({ jobType: "sync_full", dedupeKey: "sync_full:user", progressTotal: 6, db });
+    const { job } = createJob({
+      jobType: "sync_full",
+      dedupeKey: "sync_full:user",
+      progressTotal: 6,
+      db,
+    });
 
     const running = markJobRunning(job.id, "worker-1", "running", db);
     assert.equal(running?.status, "running");
@@ -116,6 +122,40 @@ test("job status helpers update progress, events, cancel and failure", () => {
     assert.equal(failed?.status, "failed");
     assert.equal(failed?.error, "boom");
     assert.ok(getJob(job.id, db)?.finished_at);
+  } finally {
+    db.close();
+  }
+});
+
+test("abandonStaleActiveJobs cancels only stale active jobs for a dedupe key", () => {
+  const db = createJobsDb();
+  try {
+    const stale = createJob({ jobType: "ocr", dedupeKey: "ocr", db });
+    db.prepare(`UPDATE jobs SET updated_at = ? WHERE id = ?`).run(
+      new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      stale.job.id,
+    );
+
+    const abandoned = abandonStaleActiveJobs({
+      dedupeKey: "ocr",
+      staleAfterMs: 2 * 60 * 1000,
+      db,
+    });
+    assert.equal(abandoned, 1);
+    assert.equal(getJob(stale.job.id, db)?.status, "cancelled");
+    assert.equal(getJob(stale.job.id, db)?.message, "Stale job abandoned");
+
+    const fresh = createJob({ jobType: "ocr", dedupeKey: "ocr", db });
+    assert.equal(fresh.created, true);
+    assert.notEqual(fresh.job.id, stale.job.id);
+
+    const freshAbandoned = abandonStaleActiveJobs({
+      dedupeKey: "ocr",
+      staleAfterMs: 2 * 60 * 1000,
+      db,
+    });
+    assert.equal(freshAbandoned, 0);
+    assert.equal(getJob(fresh.job.id, db)?.status, "queued");
   } finally {
     db.close();
   }

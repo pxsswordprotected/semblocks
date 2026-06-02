@@ -165,15 +165,12 @@ async function runFullSyncJob(job: JobRow) {
 async function runJob(jobId: string): Promise<void> {
   const initial = getJob(jobId);
   if (!initial) throw new Error(`Job not found: ${jobId}`);
-  if (!["queued", "running"].includes(initial.status)) return;
+  if (initial.status !== "queued") return;
 
   inFlight.add(jobId);
   try {
-    const running =
-      initial.status === "queued"
-        ? markJobRunning(jobId, workerId(), "Starting")
-        : initial;
-    if (!running) throw new Error(`Job not found: ${jobId}`);
+    const running = markJobRunning(jobId, workerId(), "Starting");
+    if (!running || running.status !== "running") return;
     appendJobEvent(jobId, "info", "claimed", "Job runner started");
 
     if (isJobCancelRequested(jobId)) throw new JobCancelledError();

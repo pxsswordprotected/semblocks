@@ -17,6 +17,13 @@ export type CreateJobResult = {
   created: boolean;
 };
 
+export type AbandonStaleActiveJobsOptions = {
+  dedupeKey: string;
+  staleAfterMs: number;
+  db?: Db;
+};
+
+
 function dbOrDefault(db?: Db): Db {
   return db ?? getDb();
 }
@@ -245,6 +252,40 @@ export function requestJobCancel(id: string, db?: Db): JobRow | null {
   return rowById(store, id);
 }
 
+
+export function abandonStaleActiveJobs(
+  opts: AbandonStaleActiveJobsOptions,
+): number {
+  const store = dbOrDefault(opts.db);
+  const staleBefore = new Date(Date.now() - opts.staleAfterMs).toISOString();
+  const staleJobs = store
+    .prepare(
+      `SELECT * FROM jobs
+        WHERE dedupe_key = ?
+          AND status IN ('queued', 'running')
+          AND updated_at < ?
+        ORDER BY created_at ASC`,
+    )
+    .all(opts.dedupeKey, staleBefore) as JobRow[];
+
+  if (staleJobs.length === 0) return 0;
+
+  const tx = store.transaction(() => {
+    for (const job of staleJobs) {
+      markJobCancelled(job.id, null, "Stale job abandoned", store);
+      appendJobEvent(
+        job.id,
+        "warn",
+        "stale_abandoned",
+        "Stale job abandoned",
+        { stale_after_ms: opts.staleAfterMs },
+        store,
+      );
+    }
+  });
+  tx();
+  return staleJobs.length;
+}
 export function isJobCancelRequested(id: string, db?: Db): boolean {
   const row = rowById(dbOrDefault(db), id);
   return Boolean(row?.cancel_requested_at);
