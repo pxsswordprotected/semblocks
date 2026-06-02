@@ -61,9 +61,48 @@ async function runPool<T>(
 // ~3000 tokens per high-detail image, 4s/call keeps us under ~45k TPM,
 // well below any tier-1 ceiling. Tune up if throughput becomes urgent.
 const MIN_CALL_GAP_MS = 4000;
+const MAX_RATE_LIMIT_RETRIES = 6;
+
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelayFromRateLimitMessage(message: string): number | null {
+  const ms = message.match(/try again in\s+(\d+)ms/i);
+  if (ms) return Number(ms[1]);
+
+  const seconds = message.match(/try again in\s+([0-9.]+)s/i);
+  if (seconds) return Number(seconds[1]) * 1000;
+
+  return null;
+}
+
+function isRateLimitError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const maybeStatus = err as { status?: unknown; code?: unknown; message?: unknown };
+  if (maybeStatus.status === 429 || maybeStatus.code === "rate_limit_exceeded") {
+    return true;
+  }
+  return (
+    typeof maybeStatus.message === "string" &&
+    /rate limit|too many requests|429/i.test(maybeStatus.message)
+  );
+}
+
+async function visionCaptionWithRateLimitRetry(url: string): Promise<string> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await visionCaption(url);
+    } catch (err) {
+      if (!isRateLimitError(err) || attempt >= MAX_RATE_LIMIT_RETRIES) throw err;
+
+      const message = err instanceof Error ? err.message : String(err);
+      const parsedDelay = retryDelayFromRateLimitMessage(message);
+      const fallbackDelay = 1_000 * 2 ** attempt;
+      await sleep((parsedDelay ?? fallbackDelay) + 1_000);
+    }
+  }
 }
 
 export async function ocrPendingImages(
@@ -106,6 +145,7 @@ export async function ocrPendingImages(
     return { processed: 0, errors: 0, skipped: 0, cleared };
   }
 
+  console.log(`[sync:ocr] start pending=${pending.length} limit=${limit}`);
   const upsertOcr = db.prepare(`
     INSERT INTO block_ocr (
       block_id, ocr_text, ocr_summary, ocr_model, ocr_processed_at, ocr_error
@@ -146,6 +186,7 @@ export async function ocrPendingImages(
 
   let processed = 0;
   let errors = 0;
+  let completed = 0;
 
   let lastCallEndedAt = 0;
   await runPool(pending, CONCURRENCY, async (row) => {
@@ -158,7 +199,7 @@ export async function ocrPendingImages(
     if (!url) return;
 
     try {
-      const raw = await visionCaption(url);
+      const raw = await visionCaptionWithRateLimitRetry(url);
       const parsed = parseVisionResponse(raw);
       // Single sync transaction per block: write OCR + recompute the
       // block's search_text in one shot.
@@ -212,6 +253,12 @@ export async function ocrPendingImages(
       errors += 1;
     } finally {
       lastCallEndedAt = Date.now();
+      completed += 1;
+      if (completed === pending.length || completed % 10 === 0) {
+        console.log(
+          `[sync:ocr] progress ${completed}/${pending.length} processed=${processed} errors=${errors}`,
+        );
+      }
     }
   });
 

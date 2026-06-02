@@ -22,6 +22,7 @@ test("runFullSync executes non-destructive stages in order", async () => {
     },
     ocrPendingImages: async (opts) => {
       assertNonRebuild(opts);
+      assert.equal(opts.limit, 500);
       calls.push("ocr");
       return { processed: 5, errors: 1, skipped: 0, cleared: 0 };
     },

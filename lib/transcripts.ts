@@ -383,8 +383,21 @@ export async function extractPendingTranscripts(
     return { processed: 0, errors: 0, skipped, cleared };
   }
 
+  console.log(
+    `[sync:transcripts] start fetchable=${work.length} skipped_prefilter=${skipped} limit=${limit}`,
+  );
+
   const lastStartByWorker = new Map<number, number>();
   let workerCounter = 0;
+  let completed = 0;
+  const recordProgress = () => {
+    completed += 1;
+    if (completed === work.length || completed % 10 === 0) {
+      console.log(
+        `[sync:transcripts] progress ${completed}/${work.length} processed=${processed} errors=${errors} skipped=${skipped}`,
+      );
+    }
+  };
 
   const runOne = async (item: PendingRow) => {
     const workerId = workerCounter++ % concurrency;
@@ -406,6 +419,7 @@ export async function extractPendingTranscripts(
       } catch {}
       console.error(`transcripts: block ${item.id} spawn failed: ${msg}`);
       errors += 1;
+      recordProgress();
       return;
     }
 
@@ -461,6 +475,7 @@ export async function extractPendingTranscripts(
         );
         errors += 1;
       }
+      recordProgress();
       return;
     }
 
@@ -483,6 +498,7 @@ export async function extractPendingTranscripts(
       } else {
         errors += 1;
       }
+      recordProgress();
       return;
     }
 
@@ -496,6 +512,7 @@ export async function extractPendingTranscripts(
       `transcripts: block ${item.id} (${item.source_url}) retryable: ${r.error}`,
     );
     errors += 1;
+    recordProgress();
   };
 
   // Simple bounded pool.

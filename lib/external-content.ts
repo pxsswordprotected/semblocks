@@ -387,9 +387,22 @@ export async function extractPendingExternalContent(
     return { processed: 0, errors: 0, skipped, cleared };
   }
 
+  console.log(
+    `[sync:external-content] start fetchable=${fetchable.length} skipped_prefilter=${skipped} limit=${limit}`,
+  );
+
   // Per-worker pacing: each worker waits at least delayMs between request starts.
   const lastStartByWorker = new Map<number, number>();
   let workerCounter = 0;
+  let completed = 0;
+  const recordProgress = () => {
+    completed += 1;
+    if (completed === fetchable.length || completed % 10 === 0) {
+      console.log(
+        `[sync:external-content] progress ${completed}/${fetchable.length} processed=${processed} errors=${errors} skipped=${skipped}`,
+      );
+    }
+  };
 
   await runPool(fetchable, concurrency, async (item) => {
     // Stable per-worker id derived from cursor; cheap & good enough.
@@ -417,6 +430,7 @@ export async function extractPendingExternalContent(
           })();
         } catch {}
         skipped += 1;
+        recordProgress();
         return;
       }
       const wall = rejectPostFetch(cleaned);
@@ -428,6 +442,7 @@ export async function extractPendingExternalContent(
           })();
         } catch {}
         skipped += 1;
+        recordProgress();
         return;
       }
       const stored = cleaned.slice(0, EXTERNAL_CONTENT_STORE_MAX_CHARS).trim();
@@ -487,6 +502,7 @@ export async function extractPendingExternalContent(
         );
         errors += 1;
       }
+      recordProgress();
       return;
     }
 
@@ -498,6 +514,7 @@ export async function extractPendingExternalContent(
         })();
       } catch {}
       errors += 1;
+      recordProgress();
       return;
     }
 
@@ -510,6 +527,7 @@ export async function extractPendingExternalContent(
     } catch {}
     console.error(`external-content: block ${item.row.id} (${url}) retryable: ${r.error}`);
     errors += 1;
+    recordProgress();
   });
 
   return { processed, errors, skipped, cleared };

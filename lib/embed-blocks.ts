@@ -94,6 +94,8 @@ export async function embedPendingBlocks(
     return { embedded: 0, skipped: 0, batches: 0, cleared };
   }
 
+  console.log(`[sync:embeddings] start pending=${pending.length}`);
+
   const deleteVector = db.prepare(`DELETE FROM vec_blocks WHERE block_id = ?`);
   const insertVector = db.prepare(
     `INSERT INTO vec_blocks (block_id, embedding, embedding_model, created_at)
@@ -141,6 +143,9 @@ export async function embedPendingBlocks(
     writeBatch(slice.slice(0, vectors.length), vectors);
     embedded += vectors.length;
     batches += 1;
+    console.log(
+      `[sync:embeddings] progress ${Math.min(i + BATCH_SIZE, pending.length)}/${pending.length} embedded=${embedded} skipped=${skipped} batches=${batches}`,
+    );
   }
 
   return { embedded, skipped, batches, cleared };
