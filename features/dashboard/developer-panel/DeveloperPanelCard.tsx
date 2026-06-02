@@ -6,6 +6,13 @@ import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
 import type { DevStatusLog, DevStatusResponse } from "@/lib/dev-status";
 import { cn } from "@/lib/utils";
+import type { JobEventRow, JobRow } from "@/lib/job-types";
+
+type JobResponse = {
+  job: JobRow;
+  events: JobEventRow[];
+};
+
 
 type DeveloperPanelCardProps = {
   className?: string;
@@ -61,6 +68,8 @@ export function DeveloperPanelCard({
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(
     null,
   );
+  const [ocrJob, setOcrJob] = useState<JobRow | null>(null);
+
 
   const loadStatus = useCallback(async (signal?: AbortSignal) => {
     setStatusLoading(true);
@@ -91,6 +100,9 @@ export function DeveloperPanelCard({
   const ingestUser = status?.profile?.username ?? null;
   const actionLocked = !ownerMode || Boolean(busyAction);
   const syncLocked = actionLocked || !ingestUser;
+
+  const ocrJobActive =
+    ocrJob?.status === "queued" || ocrJob?.status === "running";
 
 
   useEffect(() => {
@@ -123,6 +135,44 @@ export function DeveloperPanelCard({
     }
   }
 
+  async function loadJob(jobId: string): Promise<JobRow> {
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+    const body = (await res.json()) as JobResponse | ApiError;
+    if (!res.ok || isApiError(body)) {
+      throw new Error(isApiError(body) && body.error ? body.error : `HTTP ${res.status}`);
+    }
+    return body.job;
+  }
+
+  useEffect(() => {
+    if (!ocrJobActive || !ocrJob) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const job = await loadJob(ocrJob.id);
+        if (cancelled) return;
+        setOcrJob(job);
+        setActionMessage({ kind: job.status === "failed" ? "error" : "success", text: formatJobProgress(job) });
+        if (job.status !== "queued" && job.status !== "running") {
+          await loadStatus();
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setActionMessage({ kind: "error", text: getErrorMessage(err) });
+        }
+      }
+    };
+
+    void poll();
+    const id = window.setInterval(() => void poll(), 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [ocrJob, ocrJobActive, loadStatus]);
+
+
   async function runAction(
     id: ActionId,
     label: string,
@@ -145,6 +195,25 @@ export function DeveloperPanelCard({
       setBusyAction(null);
     }
   }
+
+  async function runOcrJob() {
+    if (!ownerMode || busyAction || ocrJobActive) return;
+
+    setActionMessage(null);
+    try {
+      const res = await fetch("/api/jobs/ocr?limit=500", { method: "POST" });
+      const body = (await res.json()) as { job_id?: string; error?: string };
+      if (!res.ok || body.error || !body.job_id) {
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const job = await loadJob(body.job_id);
+      setOcrJob(job);
+      setActionMessage({ kind: "success", text: formatJobProgress(job) });
+    } catch (err) {
+      setActionMessage({ kind: "error", text: getErrorMessage(err) });
+    }
+  }
+
 
   function runSync() {
     if (!ingestUser) return;
@@ -191,11 +260,12 @@ export function DeveloperPanelCard({
             busyAction={busyAction}
             actionMessage={actionMessage}
             actionLocked={actionLocked}
+            ocrJobActive={ocrJobActive}
             syncLocked={syncLocked}
             onRunPipeline={runPipeline}
             onRunSync={runSync}
             onRunEmbed={() => void runAction("embed", "Embed missing", ["/api/embed"])}
-            onRunOcr={() => void runAction("ocr", "OCR images", ["/api/ocr?limit=500"])}
+            onRunOcr={() => void runOcrJob()}
             onRunExternalContent={() =>
               void runAction("external-content", "Read content", [
                 "/api/external-content",
@@ -386,6 +456,7 @@ function ActionsSection({
   busyAction,
   actionMessage,
   actionLocked,
+  ocrJobActive,
   syncLocked,
   onRunPipeline,
   onRunSync,
@@ -401,6 +472,7 @@ function ActionsSection({
   actionMessage: ActionMessage | null;
   actionLocked: boolean;
   syncLocked: boolean;
+  ocrJobActive: boolean;
   onRunPipeline: () => void;
   onRunSync: () => void;
   onRunEmbed: () => void;
@@ -446,10 +518,10 @@ function ActionsSection({
           onClick={onRunEmbed}
         />
         <ActionButton
-          disabled={actionLocked}
-          busy={busyAction === "ocr"}
+          disabled={actionLocked || ocrJobActive}
+          busy={busyAction === "ocr" || ocrJobActive}
           label="OCR images"
-          busyLabel="Reading images…"
+          busyLabel="OCR job running…"
           onClick={onRunOcr}
         />
         <ActionButton
@@ -646,10 +718,19 @@ function ingestEndpoint(user: string): string {
   return `/api/arena/ingest?user=${encodeURIComponent(user)}`;
 }
 
+function formatJobProgress(job: JobRow): string {
+  const total = job.progress_total;
+  const progress =
+    total && total > 0
+      ? `${job.progress_current}/${total}`
+      : `${job.progress_current}`;
+  return `${job.message ?? job.status} (${progress})`;
+}
+
 function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function isApiError(body: DevStatusResponse | ApiError): body is ApiError {
+function isApiError(body: DevStatusResponse | JobResponse | ApiError): body is ApiError {
   return "error" in body;
 }

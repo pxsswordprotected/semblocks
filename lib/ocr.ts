@@ -33,6 +33,22 @@ export type OcrResult = {
   cleared: number;
 };
 
+export type OcrProgress = {
+  total: number;
+  completed: number;
+  processed: number;
+  errors: number;
+  skipped: number;
+};
+
+export type OcrOptions = {
+  limit?: number;
+  rebuild?: boolean;
+  onProgress?: (progress: OcrProgress) => void | Promise<void>;
+  shouldCancel?: () => boolean | Promise<boolean>;
+};
+
+
 type PendingRow = {
   id: number;
   image_display_url: string | null;
@@ -201,7 +217,7 @@ async function visionCaptionWithRateLimitRetry(url: string): Promise<string> {
 }
 
 export async function ocrPendingImages(
-  opts: { limit?: number; rebuild?: boolean } = {},
+  opts: OcrOptions = {},
 ): Promise<OcrResult> {
   const limit = opts.limit ?? 25;
   const db = getDb();
@@ -237,6 +253,13 @@ export async function ocrPendingImages(
     .all(limit) as PendingRow[];
 
   if (pending.length === 0) {
+    await opts.onProgress?.({
+      total: 0,
+      completed: 0,
+      processed: 0,
+      errors: 0,
+      skipped: 0,
+    });
     return { processed: 0, errors: 0, skipped: 0, cleared };
   }
 
@@ -281,7 +304,19 @@ export async function ocrPendingImages(
 
   let processed = 0;
   let errors = 0;
+  let skipped = 0;
   let completed = 0;
+
+  const emitProgress = async () => {
+    await opts.onProgress?.({
+      total: pending.length,
+      completed,
+      processed,
+      errors,
+      skipped,
+    });
+  };
+  let cancelled = false;
 
   const concurrency = ocrConcurrency();
   const minGapMs = minCallGapMs();
@@ -289,13 +324,27 @@ export async function ocrPendingImages(
   console.log(
     `[sync:ocr] config concurrency=${concurrency} min_start_gap_ms=${minGapMs}`,
   );
+  await emitProgress();
   await runPool(pending, concurrency, async (row) => {
+    if (cancelled || (await opts.shouldCancel?.())) {
+      cancelled = true;
+      return;
+    }
     await waitForStartSlot();
+    if (cancelled || (await opts.shouldCancel?.())) {
+      cancelled = true;
+      return;
+    }
     const url =
       row.image_display_url && row.image_display_url.trim()
         ? row.image_display_url
         : row.image_original_url;
-    if (!url) return;
+    if (!url) {
+      skipped += 1;
+      completed += 1;
+      await emitProgress();
+      return;
+    }
 
     try {
       const raw = await visionCaptionWithRateLimitRetry(url);
@@ -358,8 +407,9 @@ export async function ocrPendingImages(
           `[sync:ocr] progress ${completed}/${pending.length} processed=${processed} errors=${errors}`,
         );
       }
+      await emitProgress();
     }
   });
 
-  return { processed, errors, skipped: 0, cleared };
+  return { processed, errors, skipped, cleared };
 }

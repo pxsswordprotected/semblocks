@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowsClockwise } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "@/components/dashboard/panel";
 import { PROFILE_USERNAME } from "@/features/dashboard/profile/profile";
 import type { FullSyncResult } from "@/lib/full-sync";
+import type { JobEventRow, JobRow } from "@/lib/job-types";
+
+type JobResponse = {
+  job: JobRow;
+  events: JobEventRow[];
+};
 
 type SyncStatus =
   | { state: "idle" }
-  | { state: "running" }
-  | { state: "success"; result: FullSyncResult }
+  | { state: "running"; jobId: string; job: JobRow | null }
+  | { state: "success"; job: JobRow; result: FullSyncResult | null }
+  | { state: "cancelled"; job: JobRow }
   | { state: "error"; message: string };
 
 export function SyncCard({
@@ -23,22 +30,67 @@ export function SyncCard({
   const running = status.state === "running";
   const disabled = !ownerMode || running;
 
+  useEffect(() => {
+    if (status.state !== "running" || !status.jobId) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(status.jobId)}`);
+        const body = (await res.json()) as JobResponse | { error?: string };
+        if (!res.ok) {
+          throw new Error(
+            "error" in body && body.error
+              ? body.error
+              : `Job status failed (${res.status})`,
+          );
+        }
+        const job = (body as JobResponse).job;
+        if (cancelled) return;
+        if (job.status === "succeeded") {
+          setStatus({
+            state: "success",
+            job,
+            result: parseFullSyncResult(job.result_json),
+          });
+        } else if (job.status === "failed") {
+          setStatus({ state: "error", message: job.error ?? "Sync failed" });
+        } else if (job.status === "cancelled") {
+          setStatus({ state: "cancelled", job });
+        } else {
+          setStatus({ state: "running", jobId: status.jobId, job });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setStatus({
+          state: "error",
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
+    void poll();
+    const id = window.setInterval(() => void poll(), 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [status]);
+
   async function syncProfile() {
     if (disabled) return;
-    setStatus({ state: "running" });
+    setStatus({ state: "running", jobId: "", job: null });
 
     try {
       const res = await fetch(
-        `/api/sync?user=${encodeURIComponent(PROFILE_USERNAME)}`,
+        `/api/jobs/sync?user=${encodeURIComponent(PROFILE_USERNAME)}`,
         { method: "POST" },
       );
-      const body = (await res.json()) as FullSyncResult | { error?: string };
-      if (!res.ok) {
-        throw new Error(
-          "error" in body && body.error ? body.error : `Sync failed (${res.status})`,
-        );
+      const body = (await res.json()) as { job_id?: string; error?: string };
+      if (!res.ok || body.error || !body.job_id) {
+        throw new Error(body.error ?? `Sync failed (${res.status})`);
       }
-      setStatus({ state: "success", result: body as FullSyncResult });
+      setStatus({ state: "running", jobId: body.job_id, job: null });
     } catch (err) {
       setStatus({
         state: "error",
@@ -70,16 +122,49 @@ export function SyncCard({
   );
 }
 
+function parseFullSyncResult(raw: string | null): FullSyncResult | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as FullSyncResult;
+  } catch {
+    return null;
+  }
+}
+
+function progressText(job: JobRow | null): string {
+  if (!job) return "Starting sync job…";
+  const total = job.progress_total;
+  const prefix =
+    total && total > 0
+      ? `${job.progress_current}/${total}`
+      : `${job.progress_current}`;
+  return `${job.message ?? job.status} (${prefix})`;
+}
+
 function SyncSummary({ status }: { status: SyncStatus }) {
   if (status.state === "idle") return null;
   if (status.state === "running") {
-    return <span className="text-xs text-black/50">Running full sync pipeline…</span>;
+    return (
+      <span className="text-center text-xs leading-snug text-black/50">
+        {progressText(status.job)}
+      </span>
+    );
   }
   if (status.state === "error") {
     return <span className="text-xs text-red-600">{status.message}</span>;
   }
+  if (status.state === "cancelled") {
+    return <span className="text-xs text-black/50">Sync cancelled.</span>;
+  }
 
   const r = status.result;
+  if (!r) {
+    return (
+      <span className="text-center text-xs leading-snug text-black/60">
+        {status.job.message ?? "Sync complete."}
+      </span>
+    );
+  }
   return (
     <span className="text-center text-xs leading-snug text-black/60">
       Saved {r.ingest.channel_count} channels, {r.ingest.block_count} blocks,{" "}

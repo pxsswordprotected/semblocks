@@ -17,6 +17,9 @@ const WRITE_ENDPOINTS = [
   "/api/transcripts",
   "/api/chunks",
   "/api/sync",
+  "/api/jobs/ocr",
+  "/api/jobs/sync",
+  "/api/jobs/test-job-id/cancel",
 ] as const;
 
 test("admin write APIs reject unauthenticated and tampered cookies", { timeout: 120_000 }, async () => {
@@ -98,7 +101,7 @@ test("valid admin cookie reaches write route validation", { timeout: 120_000 }, 
   try {
     await waitForServer(`${baseUrl}/dev`, output);
     const token = createAdminSessionToken(secret, { now: Math.floor(Date.now() / 1000) });
-    for (const endpoint of ["/api/arena/ingest", "/api/sync"] as const) {
+    for (const endpoint of ["/api/arena/ingest", "/api/sync", "/api/jobs/sync"] as const) {
       const res = await fetch(`${baseUrl}${endpoint}`, {
         method: "POST",
         headers: { cookie: `${ADMIN_COOKIE_NAME}=${token}` },

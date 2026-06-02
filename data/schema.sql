@@ -142,4 +142,37 @@ CREATE TABLE chunk_embedding_meta (
     FOREIGN KEY (chunk_id) REFERENCES block_chunks(id)
 );
 
+CREATE TABLE jobs (
+    id TEXT PRIMARY KEY,
+    job_type TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
+    progress_current INTEGER NOT NULL DEFAULT 0 CHECK (progress_current >= 0),
+    progress_total INTEGER CHECK (progress_total IS NULL OR progress_total >= 0),
+    message TEXT,
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    updated_at TEXT NOT NULL,
+    finished_at TEXT,
+    cancel_requested_at TEXT,
+    dedupe_key TEXT,
+    worker_id TEXT
+);
+
+CREATE UNIQUE INDEX jobs_dedupe_active
+ON jobs(dedupe_key)
+WHERE dedupe_key IS NOT NULL AND status IN ('queued', 'running');
+
+CREATE TABLE job_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    ts TEXT NOT NULL,
+    level TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+    event_type TEXT NOT NULL,
+    message TEXT,
+    data_json TEXT,
+    FOREIGN KEY (job_id) REFERENCES jobs(id)
+);
+
 
