@@ -110,7 +110,60 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function retryDelayFromRateLimitMessage(message: string): number | null {
+function parseDurationMs(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const asNumber = Number(trimmed);
+  if (Number.isFinite(asNumber)) return Math.max(0, asNumber * 1000);
+
+  let total = 0;
+  let matched = false;
+  for (const match of trimmed.matchAll(/([0-9]+(?:\.[0-9]+)?)(ms|s|m|h)/gi)) {
+    matched = true;
+    const amount = Number(match[1]);
+    const unit = match[2].toLowerCase();
+    if (unit === "ms") total += amount;
+    else if (unit === "s") total += amount * 1000;
+    else if (unit === "m") total += amount * 60_000;
+    else if (unit === "h") total += amount * 3_600_000;
+  }
+  if (matched) return Math.max(0, total);
+
+  const asDate = Date.parse(trimmed);
+  return Number.isFinite(asDate) ? Math.max(0, asDate - Date.now()) : null;
+}
+
+function headerValue(headers: unknown, name: string): string | null {
+  if (!headers) return null;
+  if (headers instanceof Headers) return headers.get(name);
+  if (typeof headers !== "object") return null;
+
+  const record = headers as Record<string, unknown>;
+  const lowerName = name.toLowerCase();
+  for (const [key, value] of Object.entries(record)) {
+    if (key.toLowerCase() !== lowerName) continue;
+    return typeof value === "string" ? value : null;
+  }
+  return null;
+}
+
+function retryDelayFromRateLimitError(err: unknown): number | null {
+  const headers =
+    err && typeof err === "object" ? (err as { headers?: unknown }).headers : null;
+
+  for (const name of [
+    "x-ratelimit-reset-tokens",
+    "x-ratelimit-reset-requests",
+    "retry-after",
+  ]) {
+    const value = headerValue(headers, name);
+    if (!value) continue;
+    const parsed = parseDurationMs(value);
+    if (parsed !== null) return parsed;
+  }
+
+  const message = err instanceof Error ? err.message : String(err);
   const ms = message.match(/try again in\s+(\d+)ms/i);
   if (ms) return Number(ms[1]);
 
@@ -139,10 +192,10 @@ async function visionCaptionWithRateLimitRetry(url: string): Promise<string> {
     } catch (err) {
       if (!isRateLimitError(err) || attempt >= MAX_RATE_LIMIT_RETRIES) throw err;
 
-      const message = err instanceof Error ? err.message : String(err);
-      const parsedDelay = retryDelayFromRateLimitMessage(message);
+      const parsedDelay = retryDelayFromRateLimitError(err);
       const fallbackDelay = 1_000 * 2 ** attempt;
-      await sleep((parsedDelay ?? fallbackDelay) + 1_000);
+      const jitter = 250 + Math.floor(Math.random() * 750);
+      await sleep((parsedDelay ?? fallbackDelay) + jitter);
     }
   }
 }

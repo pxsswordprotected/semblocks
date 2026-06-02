@@ -8,6 +8,9 @@ import OpenAI from "openai";
 
 export const VISION_MODEL = "gpt-4o-mini";
 
+const DEFAULT_VISION_IMAGE_DETAIL = "high";
+const DEFAULT_VISION_MAX_COMPLETION_TOKENS = 500;
+
 // Use the most directed prompt for the corpus: prioritises verbatim
 // transcription, structures the metadata into parseable lines.
 export const VISION_PROMPT = `Output plain text only. Do not use markdown formatting, code fences, or asterisks.
@@ -25,6 +28,23 @@ If there is no readable text, output only the Description and Concepts lines.`;
 // Generous per-call cap because SDK retries can wait several seconds
 // between attempts when 429s land.
 const TIMEOUT_MS = 120_000;
+
+function visionImageDetail(): "low" | "high" | "auto" {
+  const raw = process.env.OCR_IMAGE_DETAIL;
+  return raw === "low" || raw === "high" || raw === "auto"
+    ? raw
+    : DEFAULT_VISION_IMAGE_DETAIL;
+}
+
+function visionMaxCompletionTokens(): number {
+  const raw = process.env.OCR_MAX_COMPLETION_TOKENS;
+  if (!raw) return DEFAULT_VISION_MAX_COMPLETION_TOKENS;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_VISION_MAX_COMPLETION_TOKENS;
+}
 
 let _client: OpenAI | null = null;
 export function visionClient(): OpenAI {
@@ -52,10 +72,11 @@ export async function visionCaption(url: string): Promise<string> {
             role: "user",
             content: [
               { type: "text", text: VISION_PROMPT },
-              { type: "image_url", image_url: { url, detail: "high" } },
+              { type: "image_url", image_url: { url, detail: visionImageDetail() } },
             ],
           },
         ],
+        max_completion_tokens: visionMaxCompletionTokens(),
       },
       { signal: controller.signal },
     );
