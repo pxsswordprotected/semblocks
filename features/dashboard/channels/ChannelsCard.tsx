@@ -56,7 +56,7 @@ function ChannelsCardFallback({ className }: { className?: string }) {
         Channels
       </h2>
       <div className="mt-4 h-px shrink-0 bg-stroke" />
-      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-between px-6">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col justify-evenly px-6">
         <p className="text-sm text-black/50">Loading channels…</p>
       </div>
       <div className="mt-4 h-px shrink-0 bg-stroke" />
@@ -145,6 +145,8 @@ function ChannelsCardInner({
     (safePage + 1) * CHANNELS_PER_PAGE,
   );
 
+  const rowSlotCount = CHANNELS_PER_PAGE + 1;
+
   function replaceSelectedChannels(ids: Set<number>) {
     const next = normalizeSelectedIds(ids, channels);
     setSelectedChannelIds(next);
@@ -188,29 +190,36 @@ function ChannelsCardInner({
             No channels indexed yet. Run Save above first.
           </p>
         ) : (
-          <>
-            <ChannelRow
-              label="All channels"
-              count={totalBlocks}
-              selected={selectedChannelIds.size === 0}
-              onClick={onClearChannels}
-            />
-            {visibleChannels.map((channel) => {
-              const disabled = channel.block_count === 0;
+          Array.from({ length: rowSlotCount }, (_, i) => {
+            if (i === 0) {
               return (
                 <ChannelRow
-                  key={channel.id}
-                  label={channel.title ?? "(untitled)"}
-                  count={channel.block_count}
-                  selected={selectedChannelIds.has(channel.id)}
-                  disabled={disabled}
-                  onClick={() => {
-                    if (!disabled) onToggleChannel(channel.id);
-                  }}
+                  key="all"
+                  label="All channels"
+                  count={totalBlocks}
+                  selected={selectedChannelIds.size === 0}
+                  onClick={onClearChannels}
                 />
               );
-            })}
-          </>
+            }
+
+            const channel = visibleChannels[i - 1];
+            if (!channel) return <ChannelRowPlaceholder key={`empty-${i}`} />;
+
+            const disabled = channel.block_count === 0;
+            return (
+              <ChannelRow
+                key={channel.id}
+                label={channel.title ?? "(untitled)"}
+                count={channel.block_count}
+                selected={selectedChannelIds.has(channel.id)}
+                disabled={disabled}
+                onClick={() => {
+                  if (!disabled) onToggleChannel(channel.id);
+                }}
+              />
+            );
+          })
         )}
       </div>
 
@@ -310,6 +319,17 @@ function setsEqual(a: Set<number>, b: Set<number>): boolean {
     if (!b.has(value)) return false;
   }
   return true;
+}
+
+function ChannelRowPlaceholder() {
+  return (
+    <div
+      aria-hidden="true"
+      className="w-full rounded-base py-1 text-sm leading-5 opacity-0"
+    >
+      &nbsp;
+    </div>
+  );
 }
 
 function ChannelRow({

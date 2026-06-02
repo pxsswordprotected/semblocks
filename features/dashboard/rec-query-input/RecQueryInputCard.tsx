@@ -6,14 +6,17 @@ import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
 import { QUERY_IMAGE_MAX_BYTES } from "@/lib/query-image-limits";
 import { cn } from "@/lib/utils";
-import type { RecommendationState, RecResponse } from "../recommendations/types";
+import type {
+  RecommendationState,
+  RecResponse,
+} from "../recommendations/types";
 
 type RecQueryInputCardProps = {
   className?: string;
   onStateChange?: (state: RecommendationState) => void;
 };
 
-const PLACEHOLDER = "Enter text to get reccomended channels";
+const PLACEHOLDER = "Enter text to get recommended channels";
 
 export function RecQueryInputCard({
   className,
@@ -31,7 +34,6 @@ export function RecQueryInputCard({
     if (!trimmed || busy) return;
     await runRecommendation("text", { text: trimmed });
   }
-
 
   function submitOnEnter(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
@@ -112,7 +114,11 @@ export function RecQueryInputCard({
           >
             <ImageIcon size={26} />
           </Button>
-          <Button type="submit" disabled={busy || !hasText} className="h-9 px-4 py-0">
+          <Button
+            type="submit"
+            disabled={busy || !hasText}
+            className="h-9 px-4 py-0"
+          >
             {busy ? "…" : "Recommend"}
           </Button>
         </div>
