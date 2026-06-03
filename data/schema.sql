@@ -175,4 +175,23 @@ CREATE TABLE job_events (
     FOREIGN KEY (job_id) REFERENCES jobs(id)
 );
 
+CREATE TABLE search_sessions (
+    id TEXT PRIMARY KEY,
+    query_text TEXT NOT NULL,
+    query_hash TEXT NOT NULL,
+    query_len INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
+CREATE INDEX search_sessions_query_hash_idx
+ON search_sessions(query_hash);
+
+CREATE INDEX search_sessions_expires_at_idx
+ON search_sessions(expires_at);
+
+CREATE INDEX search_sessions_last_used_at_idx
+ON search_sessions(last_used_at);
+
 

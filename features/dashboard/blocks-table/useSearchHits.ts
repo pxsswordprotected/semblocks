@@ -135,16 +135,17 @@ type SearchResponse = { query: string; hits: Hit[] } | { error: string };
 export function useSearchHits(): UseSearchHitsResult {
   const params = useSearchParams();
   const q = (params.get("q") ?? "").trim();
+  const sid = (params.get("sid") ?? "").trim();
   const channels = (params.get("channels") ?? "").trim();
   const page = parsePositiveInt(params.get("page"), 1);
   const pageSize = parsePositiveInt(
     params.get("pageSize"),
     DEFAULT_PAGE_SIZE,
   );
+  const hasSearch = Boolean(sid || q);
   // Cache key — see comment on `cache` at top-of-file for why this is
-  // q/channels only and not the full `${q}:${channels}:${page}:${pageSize}`.
-  const key = `${q}|${channels}`;
-
+  // query/channels only and not the full `${query}:${channels}:${page}:${pageSize}`.
+  const key = `${sid ? `sid:${sid}` : `q:${q}`}|channels:${channels}`;
   // Bumping this counter re-runs the fetch effect for retry.
   const [retryNonce, setRetryNonce] = useState(0);
 
@@ -152,13 +153,13 @@ export function useSearchHits(): UseSearchHitsResult {
   // already cached (back/forward feels instant), loading otherwise. This
   // also avoids a one-frame "loading" flash on cache hits.
   const [state, setState] = useState<SearchHitsState>(() => {
-    if (!q) return idle(pageSize);
+    if (!hasSearch) return idle(pageSize);
     const cached = cache.get(key);
     return cached ? ready(cached, page, pageSize) : loading(page, pageSize);
   });
 
   useEffect(() => {
-    if (!q) {
+    if (!hasSearch) {
       setState(idle(pageSize));
       return;
     }
@@ -174,7 +175,9 @@ export function useSearchHits(): UseSearchHitsResult {
 
     (async () => {
       try {
-        const requestParams = new URLSearchParams({ q });
+        const requestParams = new URLSearchParams();
+        if (sid) requestParams.set("sid", sid);
+        else requestParams.set("q", q);
         if (channels) requestParams.set("channels", channels);
         const res = await fetch(`/api/search?${requestParams.toString()}`, {
           signal: ctrl.signal,
@@ -198,7 +201,7 @@ export function useSearchHits(): UseSearchHitsResult {
     return () => ctrl.abort();
     // retryNonce is intentionally a dependency: bumping it forces the
     // effect to re-run with the same q/channels/page/pageSize.
-  }, [q, channels, page, pageSize, key, retryNonce]);
+  }, [hasSearch, q, sid, channels, page, pageSize, key, retryNonce]);
 
   const retry = useCallback(() => {
     cache.delete(key);

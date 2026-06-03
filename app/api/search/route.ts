@@ -9,22 +9,40 @@ import {
   QUERY_IMAGE_MAX_DATA_URL_CHARS,
   captionImageForQuery,
 } from "@/lib/vision-query";
+import {
+  SearchSessionNotFoundError,
+  resolveSearchQuery,
+} from "@/lib/search-sessions";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q");
-  if (!q || !q.trim()) {
-    return NextResponse.json({ error: "Missing ?q=" }, { status: 400 });
-  }
+  const sid = url.searchParams.get("sid");
   const limit = parseLimit(url.searchParams.get("k"));
   const channels = parseChannelFilter(url.searchParams.get("channels"));
-  const qTrim = q.trim();
+
+  let query: string;
+  try {
+    query = resolveSearchQuery({ q, sid });
+  } catch (err) {
+    if (err instanceof SearchSessionNotFoundError) {
+      return NextResponse.json(
+        { error: "Search session not found" },
+        { status: 404 },
+      );
+    }
+    throw err;
+  }
+
+  if (!query) {
+    return NextResponse.json({ error: "Missing ?q= or ?sid=" }, { status: 400 });
+  }
 
   try {
-    const hits = await runSearch(qTrim, limit, channels);
-    return NextResponse.json({ query: qTrim, hits });
+    const hits = await runSearch(query, limit, channels);
+    return NextResponse.json({ query, hits });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

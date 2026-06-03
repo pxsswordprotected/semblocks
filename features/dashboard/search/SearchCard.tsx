@@ -15,13 +15,24 @@ import { Panel } from "@/components/dashboard/panel";
 import { QUERY_IMAGE_MAX_BYTES } from "@/lib/query-image-limits";
 import { cn } from "@/lib/utils";
 
+
+const LONG_QUERY_THRESHOLD = 300;
+
+type SearchSessionCreateResponse =
+  | { sid: string; reused: boolean; expires_at: string }
+  | { error: string };
+
+type SearchSessionGetResponse =
+  | { sid: string; q: string; expires_at: string }
+  | { error: string };
+
 // Outer shell. Splits the param-reading subtree behind a Suspense
 // boundary so useSearchParams doesn't de-opt the route to client-render
 // at prerender time.
 export function SearchCard({ className }: { className?: string }) {
   return (
     <Panel className={cn("flex items-center justify-center px-4", className)}>
-      <Suspense fallback={<SearchForm initialQuery="" />}>
+      <Suspense fallback={<SearchForm initialQuery="" initialSid="" />}>
         <SearchFormFromParams />
       </Suspense>
     </Panel>
@@ -30,14 +41,22 @@ export function SearchCard({ className }: { className?: string }) {
 
 function SearchFormFromParams() {
   const params = useSearchParams();
-  return <SearchForm initialQuery={params.get("q") ?? ""} params={params} />;
+  return (
+    <SearchForm
+      initialQuery={params.get("q") ?? ""}
+      initialSid={params.get("sid") ?? ""}
+      params={params}
+    />
+  );
 }
 
 function SearchForm({
   initialQuery,
+  initialSid,
   params,
 }: {
   initialQuery: string;
+  initialSid: string;
   params?: ReadonlyURLSearchParams | null;
 }) {
   const router = useRouter();
@@ -47,8 +66,35 @@ function SearchForm({
   const hasText = query.trim().length > 0;
 
   useEffect(() => {
-    setQuery(initialQuery);
-  }, [initialQuery]);
+    if (!initialSid) {
+      setQuery(initialQuery);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/search-sessions/${encodeURIComponent(initialSid)}`,
+        );
+        const body = (await res.json()) as SearchSessionGetResponse;
+        if (cancelled) return;
+        if (!res.ok || "error" in body) {
+          throw new Error("error" in body ? body.error : `HTTP ${res.status}`);
+        }
+        setQuery(body.q);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[SearchCard] search session", err);
+          setQuery("");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialQuery, initialSid]);
 
   // Wrap the navigation in a transition so the underlying RSC fetch is
   // managed by React's transition lifecycle: errors propagate through
@@ -57,18 +103,42 @@ function SearchForm({
   // "Failed to fetch" stack pointing here).
   const [, startTransition] = useTransition();
 
-  function submitText(e: React.FormEvent) {
+  async function submitText(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = query.trim();
-    if (!trimmed) return;
+    if (!trimmed || searching) return;
     const next = new URLSearchParams(params ?? undefined);
     next.delete("page");
-    next.set("q", trimmed);
-    removeEmptyParams(next);
-    const qs = next.toString();
-    startTransition(() => {
-      router.replace(qs ? `?${qs}` : "?", { scroll: false });
-    });
+
+    try {
+      setSearching(true);
+      if (trimmed.length <= LONG_QUERY_THRESHOLD) {
+        next.delete("sid");
+        next.set("q", trimmed);
+      } else {
+        const res = await fetch("/api/search-sessions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ q: trimmed }),
+        });
+        const body = (await res.json()) as SearchSessionCreateResponse;
+        if (!res.ok || "error" in body) {
+          throw new Error("error" in body ? body.error : `HTTP ${res.status}`);
+        }
+        next.delete("q");
+        next.set("sid", body.sid);
+      }
+
+      removeEmptyParams(next);
+      const qs = next.toString();
+      startTransition(() => {
+        router.replace(qs ? `?${qs}` : "?", { scroll: false });
+      });
+    } catch (err) {
+      console.error("[SearchCard]", err);
+    } finally {
+      setSearching(false);
+    }
   }
 
   async function submitImage(file: File) {
@@ -105,7 +175,7 @@ function SearchForm({
       <button
         type="submit"
         aria-label="Search"
-        disabled={!hasText}
+        disabled={!hasText || searching}
         className={cn(
           "shrink-0",
           hasText ? "text-neutral-800" : "text-black/50",
@@ -117,7 +187,7 @@ function SearchForm({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search"
-        className="flex-1 bg-transparent text-neutral-800 outline-none placeholder:text-black/50"
+        className="min-w-0 flex-1 bg-transparent text-neutral-800 outline-none placeholder:text-black/50 disabled:opacity-60"
       />
       <Button
         type="button"

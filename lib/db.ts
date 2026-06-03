@@ -173,6 +173,33 @@ export function getDb(): Database.Database {
     }
   };
 
+  const ensureSearchSessionTables = () => {
+    if (!hasTable("search_sessions")) {
+      db.exec(`
+        CREATE TABLE search_sessions (
+            id TEXT PRIMARY KEY,
+            query_text TEXT NOT NULL,
+            query_hash TEXT NOT NULL,
+            query_len INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            last_used_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        );
+      `);
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS search_sessions_query_hash_idx
+      ON search_sessions(query_hash);
+
+      CREATE INDEX IF NOT EXISTS search_sessions_expires_at_idx
+      ON search_sessions(expires_at);
+
+      CREATE INDEX IF NOT EXISTS search_sessions_last_used_at_idx
+      ON search_sessions(last_used_at);
+    `);
+  };
+
+
   if (!hasTable("users")) {
     const schemaPath = path.join(process.cwd(), "data", "schema.sql");
     const schema = fs.readFileSync(schemaPath, "utf8");
@@ -292,6 +319,7 @@ export function getDb(): Database.Database {
     }
 
     ensureJobTables();
+    ensureSearchSessionTables();
   }
 
   _db = db;
