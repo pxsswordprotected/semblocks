@@ -31,7 +31,7 @@ type SearchSessionGetResponse =
 // at prerender time.
 export function SearchCard({ className }: { className?: string }) {
   return (
-    <Panel className={cn("flex items-center justify-center px-4", className)}>
+    <Panel className={cn("flex items-center justify-center px-6", className)}>
       <Suspense fallback={<SearchForm initialQuery="" initialSid="" />}>
         <SearchFormFromParams />
       </Suspense>
