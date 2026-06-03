@@ -58,18 +58,18 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
         </div>
 
         {/* MAIN CONTENT */}
-        <div className={`flex min-h-0 flex-1 flex-col ${DASHBOARD_GAP}`}>
+        <div className={`flex min-w-0 min-h-0 flex-1 flex-col ${DASHBOARD_GAP}`}>
           <BlocksTableCard
-            className={`${DASHBOARD_PRIMARY_PANEL_H} w-full shrink-0`}
+            className={`${DASHBOARD_PRIMARY_PANEL_H} min-w-0 w-full shrink-0`}
             selectedChannels={selectedChannels}
           />
-          <div className="flex min-h-0 w-full flex-1 flex-row">
+          <div className="flex min-h-0 min-w-0 w-full flex-1 flex-row">
             <RecQueryInputCard
-              className="h-full flex-[1] rounded-r-none border-r-0 shadow-[-1px_0_1px_rgb(0_0_0_/_0.05),-6px_0_14px_-6px_rgb(0_0_0_/_0.12),var(--shadow-inner-base)]"
+              className="h-full min-w-0 flex-[1] rounded-r-none border-r-0 shadow-[-1px_0_1px_rgb(0_0_0_/_0.05),-6px_0_14px_-6px_rgb(0_0_0_/_0.12),var(--shadow-inner-base)]"
               onStateChange={setRecommendation}
             />
             <RankingTableCard
-              className="h-full flex-[2] rounded-l-none shadow-[1px_0_1px_rgb(0_0_0_/_0.05),6px_0_14px_-6px_rgb(0_0_0_/_0.12),var(--shadow-inner-base)]"
+              className="h-full min-w-0 flex-[2] rounded-l-none shadow-[1px_0_1px_rgb(0_0_0_/_0.05),6px_0_14px_-6px_rgb(0_0_0_/_0.12),var(--shadow-inner-base)]"
               recommendation={recommendation}
             />
           </div>

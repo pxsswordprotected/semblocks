@@ -1,7 +1,7 @@
 "use client";
 
 import type { Hit } from "@/lib/search-core";
-import { BLOCK_GRID_COLUMNS } from "./columns";
+import { BLOCK_GRID_CLASS, BLOCK_GRID_COLUMNS } from "./columns";
 import {
   formatChannel,
   formatRank,
@@ -22,7 +22,7 @@ export function BlockRow({ hit, index, page, pageSize }: BlockRowProps) {
 
   return (
     <div
-      className="grid items-center gap-4 px-6 text-base text-neutral-800"
+      className={`${BLOCK_GRID_CLASS} items-center text-base text-neutral-800`}
       style={{ gridTemplateColumns: BLOCK_GRID_COLUMNS }}
     >
       <div className="tabular-nums text-black/50">

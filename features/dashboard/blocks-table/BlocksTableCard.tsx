@@ -7,7 +7,7 @@ import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
 import { BlocksTableContent } from "./BlocksTableContent";
 import { BlocksTableContentSkeleton } from "./BlocksTableContentSkeleton";
-import { BLOCK_GRID_COLUMNS } from "./columns";
+import { BLOCK_GRID_CLASS, BLOCK_GRID_COLUMNS } from "./columns";
 import type { ChannelSummary } from "../channels/types";
 
 
@@ -47,7 +47,7 @@ export function BlocksTableCard({
   const heading = formatBlocksFor(selectedChannels, totalBlocks);
 
   return (
-    <Panel className={cn("flex flex-col py-4", className)}>
+    <Panel className={cn("flex min-w-0 flex-col overflow-hidden py-4", className)}>
       <header className="relative h-5 px-6">
         <h2 className="min-w-0 truncate text-base leading-5 font-bold text-neutral-800">
           <span className="text-black/50">Blocks for: </span>
@@ -65,7 +65,7 @@ export function BlocksTableCard({
       <div className="mt-4 h-px shrink-0 bg-stroke" />
 
       <div
-        className="mt-4 grid gap-4 px-6 text-base leading-5 font-bold text-neutral-800"
+        className={`${BLOCK_GRID_CLASS} mt-4 text-base leading-5 font-bold text-neutral-800`}
         style={{ gridTemplateColumns: BLOCK_GRID_COLUMNS }}
       >
         <div>Rank</div>

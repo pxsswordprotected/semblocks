@@ -7,7 +7,7 @@ import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
 import { getPageItems } from "../blocks-table/pagination";
 import type { RecommendationState, RecChannel } from "../recommendations/types";
-import { RECOMMENDATION_GRID_COLUMNS } from "./columns";
+import { RECOMMENDATION_GRID_CLASS, RECOMMENDATION_GRID_COLUMNS } from "./columns";
 import { EvidenceBlocksHover } from "./EvidenceBlocksHover";
 import { formatChannelTitle, formatEvidence, formatEvidenceText } from "./format";
 
@@ -37,9 +37,9 @@ export function RankingTableCard({
   recommendation,
 }: RankingTableCardProps) {
   return (
-    <Panel className={cn("flex flex-col py-4", className)}>
+    <Panel className={cn("flex min-w-0 flex-col overflow-hidden py-4", className)}>
       <div
-        className="grid gap-4 px-6 text-base leading-5 font-bold text-neutral-800"
+        className={`${RECOMMENDATION_GRID_CLASS} text-base leading-5 font-bold text-neutral-800`}
         style={{ gridTemplateColumns: RECOMMENDATION_GRID_COLUMNS }}
       >
         <div>Rank</div>
@@ -160,7 +160,7 @@ function RecommendationRow({
 
   return (
     <div
-      className="grid items-center gap-4 px-6 text-base text-neutral-800"
+      className={`${RECOMMENDATION_GRID_CLASS} items-center text-base text-neutral-800`}
       style={{ gridTemplateColumns: RECOMMENDATION_GRID_COLUMNS }}
     >
       <div className="tabular-nums text-black/50">{rank}</div>

@@ -90,8 +90,8 @@ export function RecQueryInputCard({
   }
 
   return (
-    <Panel className={cn("flex flex-col px-6 py-4", className)}>
-      <form onSubmit={recommendFromText} className="flex h-full flex-col gap-4">
+    <Panel className={cn("flex min-w-0 flex-col px-6 py-4", className)}>
+      <form onSubmit={recommendFromText} className="flex h-full min-w-0 flex-col gap-4">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -104,7 +104,7 @@ export function RecQueryInputCard({
           onKeyDown={submitOnEnter}
           className="min-h-0 flex-1 resize-none bg-transparent text-base leading-6 text-neutral-800 outline-none placeholder:text-black/50 disabled:opacity-60"
         />
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center justify-between gap-3">
           <Button
             type="button"
             aria-label="Recommend channels from image"
