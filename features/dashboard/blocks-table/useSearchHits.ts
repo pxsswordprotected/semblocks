@@ -4,18 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Hit } from "@/lib/search-core";
 
-// Default page size; matches the Channels card cadence. Exported so
-// BlocksTableContent can size its slot count to the same value — that
-// keeps the auto-distributed inter-row gap identical across pages
-// whether or not the current page is full.
-export const DEFAULT_PAGE_SIZE = 8;
+import {
+  DEFAULT_RESULT_LIMIT,
+  VISIBLE_ROWS_PER_PAGE,
+} from "./resultLimit";
 
-// Module-scoped cache. The server today returns the full top-N for any
-// given q/channels pair regardless of page/pageSize (client slices), so
-// we key the cache on q plus channels — clicking page numbers becomes a
-// free re-slice instead of a refetch of identical data, while changing
-// the active channel filter gets an isolated result set. When server-side
-// pagination lands, the key gains the `:${page}:${pageSize}` suffix and
+export { DEFAULT_RESULT_LIMIT, VISIBLE_ROWS_PER_PAGE };
+
+// Module-scoped cache. The server returns the full top-K for any given
+// q/sid/channels/resultLimit tuple (client slices 8 visible rows per page),
+// so clicking page numbers becomes a free re-slice instead of a refetch.
+// When server-side pagination lands, the key gains the page suffix and
 // nothing else in the hook changes. No TTL — cleared on reload.
 const cache = new Map<string, Hit[]>();
 
@@ -76,6 +75,10 @@ function parsePositiveInt(raw: string | null, def: number): number {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : def;
 }
 
+function visibleRowsPerPage(): number {
+  return VISIBLE_ROWS_PER_PAGE;
+}
+
 function idle(pageSize: number): IdleState {
   return {
     status: "idle",
@@ -132,20 +135,22 @@ function fail(
 // Body of the search response from /api/search GET.
 type SearchResponse = { query: string; hits: Hit[] } | { error: string };
 
-export function useSearchHits(): UseSearchHitsResult {
+export function useSearchHits(
+  resultLimit = DEFAULT_RESULT_LIMIT,
+): UseSearchHitsResult {
   const params = useSearchParams();
   const q = (params.get("q") ?? "").trim();
   const sid = (params.get("sid") ?? "").trim();
   const channels = (params.get("channels") ?? "").trim();
   const page = parsePositiveInt(params.get("page"), 1);
-  const pageSize = parsePositiveInt(
-    params.get("pageSize"),
-    DEFAULT_PAGE_SIZE,
-  );
+  const pageSize = visibleRowsPerPage();
+  const safeResultLimit = Number.isFinite(resultLimit)
+    ? Math.max(1, Math.floor(resultLimit))
+    : DEFAULT_RESULT_LIMIT;
   const hasSearch = Boolean(sid || q);
   // Cache key — see comment on `cache` at top-of-file for why this is
-  // query/channels only and not the full `${query}:${channels}:${page}:${pageSize}`.
-  const key = `${sid ? `sid:${sid}` : `q:${q}`}|channels:${channels}`;
+  // query/channels/resultLimit only and not the full page state.
+  const key = `${sid ? `sid:${sid}` : `q:${q}`}|channels:${channels}|k:${safeResultLimit}`;
   // Bumping this counter re-runs the fetch effect for retry.
   const [retryNonce, setRetryNonce] = useState(0);
 
@@ -178,6 +183,7 @@ export function useSearchHits(): UseSearchHitsResult {
         const requestParams = new URLSearchParams();
         if (sid) requestParams.set("sid", sid);
         else requestParams.set("q", q);
+        requestParams.set("k", String(safeResultLimit));
         if (channels) requestParams.set("channels", channels);
         const res = await fetch(`/api/search?${requestParams.toString()}`, {
           signal: ctrl.signal,
@@ -201,7 +207,7 @@ export function useSearchHits(): UseSearchHitsResult {
     return () => ctrl.abort();
     // retryNonce is intentionally a dependency: bumping it forces the
     // effect to re-run with the same q/channels/page/pageSize.
-  }, [hasSearch, q, sid, channels, page, pageSize, key, retryNonce]);
+  }, [hasSearch, q, sid, channels, page, pageSize, safeResultLimit, key, retryNonce]);
 
   const retry = useCallback(() => {
     cache.delete(key);

@@ -1,10 +1,13 @@
 "use client";
 
+import { useCallback, useEffect, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BlockRow } from "./BlockRow";
 import { BlocksTableContentSkeleton } from "./BlocksTableContentSkeleton";
 import { BlocksTableFooter } from "./BlocksTableFooter";
 import {
-  DEFAULT_PAGE_SIZE,
+  DEFAULT_RESULT_LIMIT,
+  VISIBLE_ROWS_PER_PAGE,
   useSearchHits,
   type SearchHitsState,
 } from "./useSearchHits";
@@ -20,8 +23,40 @@ import {
 // the spacing between rows — the divider sits flush at the end of
 // the body, then the footer follows with its own `mt-4`.
 export function BlocksTableContent() {
-  const state = useSearchHits();
+  const router = useRouter();
+  const params = useSearchParams();
+  const [, startTransition] = useTransition();
+  const [resultLimit, setResultLimit] = useState(DEFAULT_RESULT_LIMIT);
+  const state = useSearchHits(resultLimit);
 
+  const setResultLimitAndResetPage = useCallback(
+    (nextLimit: number) => {
+      setResultLimit(nextLimit);
+      const next = new URLSearchParams(params);
+      next.delete("page");
+      const qs = next.toString();
+      startTransition(() => {
+        router.replace(qs ? `?${qs}` : "?", { scroll: false });
+      });
+    },
+    [params, router, startTransition],
+  );
+
+  useEffect(() => {
+    if (state.status !== "ready" || state.totalCount === 0) return;
+    const totalPages = Math.max(
+      1,
+      Math.ceil(state.totalCount / VISIBLE_ROWS_PER_PAGE),
+    );
+    if (state.page <= totalPages) return;
+
+    const next = new URLSearchParams(params);
+    next.delete("page");
+    const qs = next.toString();
+    startTransition(() => {
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    });
+  }, [params, router, startTransition, state.page, state.status, state.totalCount]);
   return (
     <>
       <BodyArea state={state} />
@@ -31,6 +66,8 @@ export function BlocksTableContent() {
         page={state.page}
         pageSize={state.pageSize}
         totalCount={state.totalCount}
+        resultLimit={resultLimit}
+        onResultLimitChange={setResultLimitAndResetPage}
       />
     </>
   );
@@ -71,8 +108,10 @@ function BodyArea({
     );
   }
 
-  const { hits, page, pageSize } = state;
-  const start = (page - 1) * pageSize;
+  const { hits, page, pageSize, totalCount } = state;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const start = (safePage - 1) * pageSize;
   const visible = hits.slice(start, start + pageSize);
 
   if (visible.length === 0) {
@@ -85,12 +124,12 @@ function BodyArea({
 
   // Render a fixed number of slots so the auto-distributed gap stays
   // identical whether the page is full or sparse. Slot count is
-  // max(visible.length, DEFAULT_PAGE_SIZE): full pages use exactly
-  // pageSize slots; sparse pages (last page / few hits) fill the
+  // max(visible.length, VISIBLE_ROWS_PER_PAGE): full pages use exactly
+  // 8 row slots; sparse pages (last page / few hits) fill the
   // remainder with invisible spacers so the real rows sit at the top
   // with the same gap rhythm as a full page. Spacer height matches
   // a row's intrinsic height (text-base leading-6 = 24px = h-6).
-  const slotCount = Math.max(visible.length, DEFAULT_PAGE_SIZE);
+  const slotCount = Math.max(visible.length, VISIBLE_ROWS_PER_PAGE);
 
   return (
     <div className="flex flex-1 flex-col justify-evenly">
@@ -102,7 +141,7 @@ function BodyArea({
               key={`${hit.match_type}-${hit.block_id}-${hit.chunk_index ?? "b"}`}
               hit={hit}
               index={i}
-              page={page}
+              page={safePage}
               pageSize={pageSize}
             />
           );
