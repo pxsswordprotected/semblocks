@@ -17,6 +17,11 @@ type ChannelRow = {
   block_count: number;
 };
 
+type TotalRow = {
+  block_count: number;
+};
+
+
 export async function GET() {
   const db = getDb();
   const rows = db
@@ -29,5 +34,12 @@ export async function GET() {
         ORDER BY block_count DESC, lower(c.title)`,
     )
     .all() as ChannelRow[];
-  return NextResponse.json({ channels: rows });
+  const total = db
+    .prepare(`SELECT COUNT(*) AS block_count FROM blocks`)
+    .get() as TotalRow;
+
+  return NextResponse.json({
+    channels: rows,
+    total_block_count: total.block_count,
+  });
 }

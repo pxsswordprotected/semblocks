@@ -24,6 +24,12 @@ type IndexedChannel = ChannelSummary & {
   url: string | null;
 };
 
+type ChannelsResponse = {
+  channels: IndexedChannel[];
+  total_block_count: number;
+};
+
+
 type ChannelsCardProps = {
   className?: string;
   onSelectionChange?: (channels: ChannelSummary[]) => void;
@@ -74,6 +80,7 @@ function ChannelsCardInner({
   const channelsParam = searchParams.get("channels");
   const [, startTransition] = useTransition();
   const [channels, setChannels] = useState<IndexedChannel[] | null>(null);
+  const [totalBlockCount, setTotalBlockCount] = useState(0);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [selectedChannelIds, setSelectedChannelIds] = useState<Set<number>>(
@@ -86,14 +93,13 @@ function ChannelsCardInner({
     setChannelsError(null);
     try {
       const res = await fetch("/api/channels");
-      const body = (await res.json()) as
-        | { channels: IndexedChannel[] }
-        | { error: string };
+      const body = (await res.json()) as ChannelsResponse | { error: string };
       if (!res.ok || "error" in body) {
         const msg = "error" in body ? body.error : `HTTP ${res.status}`;
         throw new Error(msg);
       }
       setChannels(body.channels);
+      setTotalBlockCount(body.total_block_count);
       setPage(0);
     } catch (err) {
       setChannelsError(err instanceof Error ? err.message : String(err));
@@ -122,10 +128,7 @@ function ChannelsCardInner({
     const start = safePage * CHANNELS_PER_PAGE;
     return channels.slice(start, start + CHANNELS_PER_PAGE);
   }, [channels, safePage]);
-  const totalBlocks = useMemo(
-    () => channels?.reduce((sum, c) => sum + c.block_count, 0) ?? 0,
-    [channels],
-  );
+  const totalBlocks = totalBlockCount;
   const selectedChannels = useMemo<ChannelSummary[]>(() => {
     if (!channels || selectedChannelIds.size === 0) return [];
     return channels

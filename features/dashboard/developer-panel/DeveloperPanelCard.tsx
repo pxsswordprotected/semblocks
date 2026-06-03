@@ -49,6 +49,8 @@ const SECTIONS: readonly { id: SectionId; title: string }[] = [
 const NUMBER_FORMATTER = new Intl.NumberFormat("en-US");
 
 const NON_DEV_DISABLED_TOOLTIP = "Disabled because you are not in dev mode.";
+const STALE_OCR_JOB_MS = 2 * 60 * 1000;
+
 
 function isDevModeOnlySection(id: SectionId): boolean {
   return id === "actions" || id === "debug";
@@ -102,7 +104,17 @@ export function DeveloperPanelCard({
   const syncLocked = actionLocked || !ingestUser;
 
   const ocrJobActive =
-    ocrJob?.status === "queued" || ocrJob?.status === "running";
+    (ocrJob?.status === "queued" || ocrJob?.status === "running") &&
+    !isStaleJob(ocrJob);
+
+  useEffect(() => {
+    if (!ocrJob || !isStaleJob(ocrJob)) return;
+    setActionMessage({
+      kind: "error",
+      text: "OCR job stalled. Click OCR images to abandon it and start a fresh job.",
+    });
+  }, [ocrJob]);
+
 
 
   useEffect(() => {
@@ -716,6 +728,13 @@ function formatCount(value: number): string {
 
 function ingestEndpoint(user: string): string {
   return `/api/arena/ingest?user=${encodeURIComponent(user)}`;
+}
+
+function isStaleJob(job: JobRow): boolean {
+  if (job.status !== "queued" && job.status !== "running") return false;
+  const updatedAt = Date.parse(job.updated_at);
+  if (!Number.isFinite(updatedAt)) return false;
+  return Date.now() - updatedAt > STALE_OCR_JOB_MS;
 }
 
 function formatJobProgress(job: JobRow): string {
