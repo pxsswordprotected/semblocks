@@ -134,8 +134,7 @@ export default function Page() {
     ocr_summary: string | null;
   } | null>(null);
   const [searchCaptionOpen, setSearchCaptionOpen] = useState(false);
-  const [searchTranscriptionOpen, setSearchTranscriptionOpen] =
-    useState(false);
+  const [searchTranscriptionOpen, setSearchTranscriptionOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [channels, setChannels] = useState<IndexedChannel[] | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
@@ -277,9 +276,7 @@ export default function Page() {
       }
       const clearedPart = body.cleared > 0 ? `cleared ${body.cleared}, ` : "";
       const suffix =
-        body.processed > 0
-          ? " → click Rebuild to refresh embeddings"
-          : "";
+        body.processed > 0 ? " → click Rebuild to refresh embeddings" : "";
       setOcrStatus(
         body.processed === 0 && body.errors === 0
           ? `${clearedPart}nothing pending`
@@ -298,7 +295,9 @@ export default function Page() {
     setExtLoading(true);
     setExtStatus(null);
     try {
-      const url = rebuild ? `/api/external-content?rebuild=1` : `/api/external-content`;
+      const url = rebuild
+        ? `/api/external-content?rebuild=1`
+        : `/api/external-content`;
       const res = await fetch(url, { method: "POST" });
       const body = (await res.json()) as
         | {
@@ -364,9 +363,7 @@ export default function Page() {
           : `${clearedPart}fetched ${body.processed}, ${body.errors} error${body.errors === 1 ? "" : "s"}${skippedPart}${suffix}`,
       );
     } catch (err) {
-      setTxStatus(
-        `error: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      setTxStatus(`error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setTxLoading(false);
     }
@@ -477,7 +474,9 @@ export default function Page() {
     setSearchCaptionOpen(false);
     setSearchTranscriptionOpen(false);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}${channelFilterParam()}`);
+      const res = await fetch(
+        `/api/search?q=${encodeURIComponent(query.trim())}${channelFilterParam()}`,
+      );
       const body = (await res.json()) as
         | { query: string; hits: SearchHit[] }
         | { error: string };
@@ -609,7 +608,7 @@ export default function Page() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12 font-mono text-sm">
-      <h1 className="mb-6 text-2xl font-semibold">aresearch</h1>
+      <h1 className="mb-6 text-2xl font-semibold">SemBlocks</h1>
       <form onSubmit={onSubmit} className="flex gap-2">
         <input
           value={input}
@@ -718,7 +717,9 @@ export default function Page() {
       {embedStatus && (
         <p
           className={`mt-2 text-sm ${
-            embedStatus.startsWith("error") ? "text-red-600" : "text-neutral-700"
+            embedStatus.startsWith("error")
+              ? "text-red-600"
+              : "text-neutral-700"
           }`}
         >
           {embedStatus}
@@ -754,7 +755,9 @@ export default function Page() {
       {chunkStatus && (
         <p
           className={`mt-2 text-sm ${
-            chunkStatus.startsWith("error") ? "text-red-600" : "text-neutral-700"
+            chunkStatus.startsWith("error")
+              ? "text-red-600"
+              : "text-neutral-700"
           }`}
         >
           {chunkStatus}
@@ -832,9 +835,7 @@ export default function Page() {
                     <li key={c.id}>
                       <label
                         className={`flex items-center gap-2 py-0.5 text-sm ${
-                          disabled
-                            ? "text-neutral-400"
-                            : "text-neutral-800"
+                          disabled ? "text-neutral-400" : "text-neutral-800"
                         }`}
                       >
                         <input
@@ -843,7 +844,9 @@ export default function Page() {
                           disabled={disabled}
                           onChange={() => onToggleChannel(c.id)}
                         />
-                        <span className="truncate">{c.title ?? "(untitled)"}</span>
+                        <span className="truncate">
+                          {c.title ?? "(untitled)"}
+                        </span>
                         <span className="ml-auto text-neutral-500">
                           ({c.block_count})
                         </span>
@@ -991,11 +994,7 @@ export default function Page() {
             </>
           )}
           .{" "}
-          <button
-            type="button"
-            onClick={onClearChannels}
-            className="underline"
-          >
+          <button type="button" onClick={onClearChannels} className="underline">
             clear filter
           </button>
         </p>
@@ -1006,7 +1005,10 @@ export default function Page() {
       {hits && hits.length > 0 && (
         <section className="mt-4 space-y-3">
           {hits.map((h) => (
-            <div key={h.block_id} className="border-l-2 border-neutral-200 pl-3">
+            <div
+              key={h.block_id}
+              className="border-l-2 border-neutral-200 pl-3"
+            >
               <div>
                 <span
                   className="text-neutral-500"
@@ -1141,9 +1143,7 @@ export default function Page() {
             </div>
           </form>
         )}
-        {recError && (
-          <p className="mt-2 text-sm text-red-600">{recError}</p>
-        )}
+        {recError && <p className="mt-2 text-sm text-red-600">{recError}</p>}
         {recCaption && (
           <div className="mt-3 rounded border border-neutral-200 bg-neutral-50 p-3 text-neutral-700">
             <div className="flex items-start justify-between gap-2">
@@ -1338,7 +1338,11 @@ export default function Page() {
           {data.channels.map((c) => (
             <div key={c.id} className="mb-4">
               <div>
-                - {c.title} ({c.blocks.length < c.total ? `${c.blocks.length} of ${c.total}` : c.total} items)
+                - {c.title} (
+                {c.blocks.length < c.total
+                  ? `${c.blocks.length} of ${c.total}`
+                  : c.total}{" "}
+                items)
               </div>
               {c.blocks.length === 0 ? (
                 <div className="pl-4 text-neutral-500">(no blocks)</div>
@@ -1346,8 +1350,8 @@ export default function Page() {
                 c.blocks.map((b) => (
                   <div key={b.id} className="pl-4">
                     <div>
-                      {b.position !== undefined ? `#${b.position} ` : ""}
-                      [{b.type}] {b.title}{" "}
+                      {b.position !== undefined ? `#${b.position} ` : ""}[
+                      {b.type}] {b.title}{" "}
                       <span className="text-neutral-500">(id {b.id})</span>
                     </div>
                     {b.source_url && (
