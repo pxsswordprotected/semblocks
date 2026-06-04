@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.env
+.env.local
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.DS_Store
+next-env.d.ts.bak
+*.md
+!features/dashboard/developer-panel/README.md
