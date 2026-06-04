@@ -30,9 +30,7 @@ type SearchSessionGetResponse =
   | { sid: string; q: string; expires_at: string }
   | { error: string };
 
-type ImageSearchResponse =
-  | { query: string; hits: Hit[] }
-  | { error: string };
+type ImageSearchResponse = { query: string; hits: Hit[] } | { error: string };
 
 type DemoSummary = { id: string; label: string; is_image: boolean };
 type DemoListResponse = { demos: DemoSummary[] } | { error: string };
@@ -48,8 +46,17 @@ export function SearchCard({
   ownerMode?: boolean;
 }) {
   return (
-    <Panel className={cn("relative flex items-center justify-center px-6", className)}>
-      <Suspense fallback={<SearchForm initialQuery="" initialSid="" ownerMode={ownerMode} />}>
+    <Panel
+      className={cn(
+        "relative flex items-center justify-center px-6",
+        className,
+      )}
+    >
+      <Suspense
+        fallback={
+          <SearchForm initialQuery="" initialSid="" ownerMode={ownerMode} />
+        }
+      >
         <SearchFormFromParams ownerMode={ownerMode} />
       </Suspense>
     </Panel>
@@ -242,6 +249,7 @@ function SearchForm({
         </button>
         <input
           value={query}
+          spellCheck="false"
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
             if (!ownerMode) setGateOpen(true);
@@ -301,8 +309,8 @@ function DemoGate({
     <div className="absolute top-full left-0 z-20 mt-2 w-full rounded-base border border-stroke bg-white p-4 shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-5 text-black/60">
-          Live search uses an OpenAI key. Clone the project to run it on your own
-          data and key. For now, try a demo search:
+          Live search uses an OpenAI key. Clone the project to run it on your
+          own data and key. For now, try a demo search:
         </p>
         <button
           type="button"
@@ -314,7 +322,9 @@ function DemoGate({
         </button>
       </div>
       {demos.length === 0 ? (
-        <p className="mt-3 text-sm text-black/40">No demo searches available.</p>
+        <p className="mt-3 text-sm text-black/40">
+          No demo searches available.
+        </p>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
           {demos.map((d) => (
