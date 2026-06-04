@@ -79,7 +79,7 @@ test("/dev login sets a signed httpOnly admin cookie", { timeout: 120_000 }, asy
     assert.equal(privateDev.status, 200);
     const privateHtml = await privateDev.text();
     assert.match(privateHtml, /Log out/);
-    assert.match(privateHtml, /aresearch/);
+    assert.match(privateHtml, /Semblocks/);
 
     const tamperedDev = await fetch(`${baseUrl}/dev`, {
       headers: { cookie: `${ADMIN_COOKIE_NAME}=${adminCookie}x` },

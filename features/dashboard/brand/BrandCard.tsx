@@ -9,7 +9,7 @@ export function BrandCard({ className }: { className?: string }) {
         className,
       )}
     >
-      <p className="text-xl ">Aresearch v1.0</p>
+      <p className="text-xl ">Semblocks v1.0</p>
       <a
         href="https://github.com/pxsswordprotected/aresearch"
         target="_blank"

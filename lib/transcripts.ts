@@ -211,7 +211,7 @@ async function fetchOne(
   url: string,
   timeoutMs: number,
 ): Promise<FetchResult> {
-  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "aresearch-yt-"));
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "semblocks-yt-"));
   try {
     const result = await spawnYtDlp(url, tmpRoot, timeoutMs);
     if (result.code !== 0) {

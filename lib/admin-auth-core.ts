@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export const ADMIN_COOKIE_NAME = "aresearch_admin";
+export const ADMIN_COOKIE_NAME = "semblocks_admin";
 export const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 export type AdminAuthConfig = {

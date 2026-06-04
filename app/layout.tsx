@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "aresearch",
-  description: "Semantic search over local documents.",
+  title: "Semblocks",
+  description: "Semantic search over local research archives.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
