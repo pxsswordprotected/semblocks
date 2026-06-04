@@ -7,9 +7,16 @@ import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
 import { getPageItems } from "../blocks-table/pagination";
 import type { RecommendationState, RecChannel } from "../recommendations/types";
-import { RECOMMENDATION_GRID_CLASS, RECOMMENDATION_GRID_COLUMNS } from "./columns";
+import {
+  RECOMMENDATION_GRID_CLASS,
+  RECOMMENDATION_GRID_COLUMNS,
+} from "./columns";
 import { EvidenceBlocksHover } from "./EvidenceBlocksHover";
-import { formatChannelTitle, formatEvidence, formatEvidenceText } from "./format";
+import {
+  formatChannelTitle,
+  formatEvidence,
+  formatEvidenceText,
+} from "./format";
 
 type RankingTableCardProps = {
   className?: string;
@@ -37,7 +44,9 @@ export function RankingTableCard({
   recommendation,
 }: RankingTableCardProps) {
   return (
-    <Panel className={cn("flex min-w-0 flex-col overflow-hidden py-4", className)}>
+    <Panel
+      className={cn("flex min-w-0 flex-col overflow-hidden py-4", className)}
+    >
       <div
         className={`${RECOMMENDATION_GRID_CLASS} text-base leading-5 font-bold text-neutral-800`}
         style={{ gridTemplateColumns: RECOMMENDATION_GRID_COLUMNS }}
@@ -183,11 +192,14 @@ function RecommendationRow({
         <ConfidencePill score={channel.score} />
       </div>
       <div
-        className="flex min-w-0 items-center gap-2 overflow-hidden text-black/70"
+        className="grid min-w-0 grid-cols-[3.8rem_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden text-black/70"
         title={formatEvidence(channel)}
       >
-        <EvidenceBlocksHover blocks={evidenceBlocksFor(channel)} />
-        <span aria-hidden="true" className="text-black/30">
+        <EvidenceBlocksHover
+          blocks={evidenceBlocksFor(channel)}
+          className="w-[4.5rem] shrink-0 whitespace-nowrap text-left"
+        />
+        <span aria-hidden="true" className="shrink-0 text-black/30">
           |
         </span>
         <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
