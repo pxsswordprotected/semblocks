@@ -10,23 +10,9 @@ export default async function DevPage({ searchParams }: DevPageProps) {
   const admin = await isAdmin();
   if (admin) {
     return (
-      <>
-        <form
-          action="/api/admin/logout"
-          method="post"
-          className="fixed top-4 right-4 z-50"
-        >
-          <button
-            type="submit"
-            className="rounded-base border border-stroke bg-dashboard px-3 py-2 text-sm font-bold text-neutral-800 shadow-[var(--shadow-base),var(--shadow-inner-base)] hover:opacity-80"
-          >
-            Log out
-          </button>
-        </form>
-        <DashboardViewportGate>
-          <Dashboard ownerMode />
-        </DashboardViewportGate>
-      </>
+      <DashboardViewportGate>
+        <Dashboard ownerMode />
+      </DashboardViewportGate>
     );
   }
 

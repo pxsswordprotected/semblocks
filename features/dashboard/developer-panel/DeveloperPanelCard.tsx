@@ -359,6 +359,13 @@ export function DeveloperPanelCard({
               </div>
             );
           })}
+          {ownerMode ? (
+            <form action="/api/admin/logout" method="post" className="pt-1">
+              <Button type="submit" className="w-full px-3 py-2">
+                Log out
+              </Button>
+            </form>
+          ) : null}
         </div>
       </div>
     </Panel>

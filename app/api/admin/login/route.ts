@@ -6,6 +6,7 @@ import {
   getConfiguredAdminAuth,
 } from "@/lib/admin-auth";
 import { isAdminAuthConfigured, verifyAdminPassword } from "@/lib/admin-auth-core";
+import { sameOriginPathUrl } from "@/lib/request-url";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
   const token = createCurrentAdminSessionToken();
   const res = wantsJson
     ? NextResponse.json({ ok: true })
-    : NextResponse.redirect(new URL("/dev", req.url), { status: 303 });
+    : NextResponse.redirect(sameOriginPathUrl(req, "/dev"), { status: 303 });
   res.cookies.set(ADMIN_COOKIE_NAME, token, adminCookieOptions());
   return res;
 }
@@ -81,7 +82,7 @@ function authFailure(
   if (wantsJson) {
     return NextResponse.json({ error: message }, { status });
   }
-  const url = new URL("/dev", req.url);
+  const url = sameOriginPathUrl(req, "/dev");
   url.searchParams.set("error", code);
   return NextResponse.redirect(url, { status: 303 });
 }

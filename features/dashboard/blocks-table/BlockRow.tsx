@@ -54,11 +54,10 @@ export function BlockRow({ hit, index, page, pageSize }: BlockRowProps) {
   );
 }
 
-// Actions cell: Are.na link on the left, Source link flush against the
-// cell's right edge (= panel's right margin, since the parent row uses
-// px-6). Both slots always render so the column reads uniformly down
-// the table; a missing target renders as muted plain text rather than
-// a link, and the divider stays so column rhythm is preserved.
+// Actions cell: links are left-aligned with the Actions header. Both slots
+// always render so the column reads uniformly down the table; a missing target
+// renders as muted plain text rather than a link, and the divider stays so
+// column rhythm is preserved.
 function ActionsCell({
   arenaUrl,
   sourceUrl,
@@ -67,7 +66,7 @@ function ActionsCell({
   sourceUrl: string | null;
 }) {
   return (
-    <div className="flex min-w-0 items-center justify-end gap-2">
+    <div className="flex min-w-0 items-center justify-start gap-2">
       <LinkOrPlaceholder href={arenaUrl} label="Are.na" />
       <span className="text-black/20" aria-hidden="true">
         |

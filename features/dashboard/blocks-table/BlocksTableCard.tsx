@@ -57,10 +57,10 @@ export function BlocksTableCard({
         </h2>
         <Button
           type="button"
-          className="absolute top-1/2 right-6 -translate-y-1/2 gap-1.5 px-3 py-1 text-sm leading-5 font-bold"
+          aria-label="Filter blocks"
+          className="absolute top-1/2 right-6 flex h-9 w-9 -translate-y-1/2 items-center justify-center px-0 py-0"
         >
-          <Funnel size={18} weight="bold" />
-          Filter
+          <Funnel size={22} weight="bold" />
         </Button>
       </header>
 
@@ -75,7 +75,7 @@ export function BlocksTableCard({
         <div>Type</div>
         <div>Channel</div>
         <div>Snippet</div>
-        <div>Actions</div>
+        <div>View</div>
       </div>
 
       <div className="mt-4 h-px shrink-0 bg-stroke" />
