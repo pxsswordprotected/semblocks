@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+.git
+.gitignore
+.env
+.env.*
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/*.db
+data/*.db-*
+.DS_Store
+npm-debug.log*
