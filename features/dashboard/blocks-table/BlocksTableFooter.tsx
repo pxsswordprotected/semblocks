@@ -4,8 +4,6 @@ import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
-import { cn } from "@/lib/utils";
-import { getPageItems } from "./pagination";
 import type { SearchHitsState } from "./useSearchHits";
 
 type FooterProps = {
@@ -39,7 +37,7 @@ export function BlocksTableFooter({
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const safePage = Math.min(page, totalPages);
+  const safePage = Math.min(Math.max(1, page), totalPages);
   const start = (safePage - 1) * pageSize + 1;
   const end = Math.min(safePage * pageSize, totalCount);
 
@@ -58,22 +56,6 @@ function Pagination({ current, total }: { current: number; total: number }) {
   const params = useSearchParams();
   const [, startTransition] = useTransition();
 
-  if (total <= 1) {
-    return (
-      <div className="flex shrink-0 items-center gap-1">
-        <Button
-          variant="primary"
-          aria-label="Page 1"
-          aria-current="page"
-          disabled
-          className="h-7 min-w-7 px-1.5 py-0 text-sm tabular-nums disabled:opacity-100"
-        >
-          1
-        </Button>
-      </div>
-    );
-  }
-
   function gotoPage(n: number) {
     const next = new URLSearchParams(params);
     // Page 1 is the implicit default; keep the URL clean by omitting it.
@@ -84,8 +66,6 @@ function Pagination({ current, total }: { current: number; total: number }) {
       router.replace(qs ? `?${qs}` : "?", { scroll: false });
     });
   }
-
-  const items = getPageItems(current, total);
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -99,31 +79,9 @@ function Pagination({ current, total }: { current: number; total: number }) {
         <CaretLeft size={14} weight="bold" />
       </Button>
 
-      {items.map((item) =>
-        item.kind === "ellipsis" ? (
-          <span
-            key={`ellipsis-${item.key}`}
-            aria-hidden="true"
-            className="px-1 text-sm text-black/30 select-none"
-          >
-            …
-          </span>
-        ) : (
-          <Button
-            key={item.n}
-            variant={item.n === current ? "primary" : "muted"}
-            aria-label={`Page ${item.n}`}
-            aria-current={item.n === current ? "page" : undefined}
-            onClick={() => gotoPage(item.n)}
-            className={cn(
-              "h-7 min-w-7 px-1.5 py-0 text-sm tabular-nums",
-            )}
-          >
-            {item.n}
-          </Button>
-        ),
-      )}
-
+      <span className="min-w-12 px-1 text-center text-sm font-normal tabular-nums text-neutral-800">
+        {current}/{total}
+      </span>
       <Button
         variant="muted"
         aria-label="Next page"

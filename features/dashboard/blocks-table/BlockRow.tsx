@@ -66,7 +66,7 @@ function ActionsCell({
   sourceUrl: string | null;
 }) {
   return (
-    <div className="flex min-w-0 items-center justify-start gap-2">
+    <div className="flex min-w-0 items-center justify-start gap-2 whitespace-nowrap">
       <LinkOrPlaceholder href={arenaUrl} label="Are.na" />
       <span className="text-black/20" aria-hidden="true">
         |
