@@ -21,6 +21,9 @@ import {
 import type { Hit } from "@/lib/search-core";
 
 const LONG_QUERY_THRESHOLD = 300;
+const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp";
+const IMAGE_TYPE_WARNING = "Paste or upload a JPG, PNG, or WebP image.";
+
 
 type SearchSessionCreateResponse =
   | { sid: string; reused: boolean; expires_at: string }
@@ -90,6 +93,7 @@ function SearchForm({
   const [query, setQuery] = useState(initialQuery);
   const [searching, setSearching] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
+  const [imageWarning, setImageWarning] = useState<string | null>(null);
   const [demos, setDemos] = useState<DemoSummary[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const hasText = query.trim().length > 0;
@@ -177,6 +181,7 @@ function SearchForm({
     }
 
     try {
+      setImageWarning(null);
       setSearching(true);
       if (trimmed.length <= LONG_QUERY_THRESHOLD) {
         navigateSource("q", trimmed);
@@ -200,15 +205,20 @@ function SearchForm({
   }
 
   async function submitImage(file: File) {
+    if (searching) return;
     if (!ownerMode) {
       setGateOpen(true);
       return;
     }
-    if (!file.type.startsWith("image/")) return;
-    if (file.size > QUERY_IMAGE_MAX_BYTES) {
-      console.error("[SearchCard] image too large");
+    if (!isSupportedImageFile(file)) {
+      setImageWarning(IMAGE_TYPE_WARNING);
       return;
     }
+    if (file.size > QUERY_IMAGE_MAX_BYTES) {
+      setImageWarning("Image is too large. Try a smaller JPG, PNG, or WebP image.");
+      return;
+    }
+    setImageWarning(null);
     setSearching(true);
     try {
       const dataUrl = await readFileAsDataUrl(file);
@@ -233,6 +243,27 @@ function SearchForm({
     }
   }
 
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const file = firstClipboardFile(e.clipboardData);
+    if (!file) {
+      setImageWarning(null);
+      return;
+    }
+
+    e.preventDefault();
+    if (!ownerMode) {
+      setGateOpen(true);
+      return;
+    }
+
+    if (!isSupportedImageFile(file)) {
+      setImageWarning(IMAGE_TYPE_WARNING);
+      return;
+    }
+
+    void submitImage(file);
+  }
+
   return (
     <>
       <form onSubmit={submitText} className="flex w-full items-center gap-3">
@@ -250,10 +281,14 @@ function SearchForm({
         <input
           value={query}
           spellCheck="false"
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setImageWarning(null);
+            setQuery(e.target.value);
+          }}
           onFocus={() => {
             if (!ownerMode) setGateOpen(true);
           }}
+          onPaste={handlePaste}
           placeholder="Search"
           className="min-w-0 flex-1 bg-transparent text-neutral-800 outline-none placeholder:text-black/50 disabled:opacity-60"
         />
@@ -272,7 +307,7 @@ function SearchForm({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept={ACCEPTED_IMAGE_TYPES}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -281,6 +316,12 @@ function SearchForm({
           }}
         />
       </form>
+
+      {ownerMode && imageWarning ? (
+        <p className="absolute top-full right-6 left-6 mt-2 rounded-base border border-error/30 bg-dashboard px-3 py-2 text-xs leading-4 text-error shadow-[var(--shadow-base)]">
+          {imageWarning}
+        </p>
+      ) : null}
 
       {!ownerMode && gateOpen ? (
         <DemoGate
@@ -348,6 +389,31 @@ function removeEmptyParams(params: URLSearchParams) {
   for (const [key, value] of Array.from(params.entries())) {
     if (value === "") params.delete(key);
   }
+}
+
+function firstClipboardFile(data: DataTransfer): File | null {
+  const files: File[] = [];
+  for (const item of Array.from(data.items)) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    if (file) files.push(file);
+  }
+
+  if (files.length === 0) {
+    files.push(...Array.from(data.files));
+  }
+
+  return files.find(isSupportedImageFile) ?? files[0] ?? null;
+}
+
+function isSupportedImageFile(file: File): boolean {
+  const mime = file.type.toLowerCase();
+  if (mime === "image/jpeg" || mime === "image/png" || mime === "image/webp") {
+    return true;
+  }
+
+  if (mime !== "") return false;
+  return /\.(jpe?g|png|webp)$/i.test(file.name);
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
