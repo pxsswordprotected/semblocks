@@ -34,7 +34,7 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
 
   return (
     <main
-      className={`flex h-screen min-h-0 flex-col overflow-hidden p-[clamp(1rem,2vw,2rem)] ${DASHBOARD_GAP}`}
+      className={`flex h-screen min-h-0 flex-col overflow-hidden px-[44px] py-[clamp(1rem,2vw,2rem)] ${DASHBOARD_GAP}`}
     >
       {/* TOP BAR */}
       <div className={`flex shrink-0 flex-row ${DASHBOARD_GAP}`}>
