@@ -13,6 +13,7 @@ test("/dev login sets a signed httpOnly admin cookie", { timeout: 120_000 }, asy
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const server = spawn("npm", ["run", "dev", "--", "--hostname", "127.0.0.1", "--port", String(port)], {
+    detached: true,
     env: {
       ...process.env,
       ARESEARCH_ADMIN_PASSWORD: "correct horse battery staple",
@@ -135,9 +136,9 @@ async function getFreePort(): Promise<number> {
   const address = server.address();
   assert.ok(address && typeof address === "object");
   const { port } = address;
-  await new Promise<void>((resolve, reject) => {
-    server.close((err) => (err ? reject(err) : resolve()));
-  });
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  server.close((err) => (err ? reject(err) : resolve()));
+  await promise;
   return port;
 }
 
@@ -152,21 +153,33 @@ async function waitForServer(url: string, output: string[]) {
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await delay(250);
   }
   throw new Error(`Next dev server did not start: ${lastError}\n${output.join("")}`);
 }
 
 async function stopServer(server: ChildProcessWithoutNullStreams) {
   if (server.exitCode !== null || server.signalCode !== null) return;
-  server.kill("SIGTERM");
-  const timeout = new Promise<void>((resolve) => {
-    setTimeout(() => {
-      if (server.exitCode === null && server.signalCode === null) {
+  const pid = server.pid;
+  if (pid) {
+    process.kill(-pid, "SIGTERM");
+  } else {
+    server.kill("SIGTERM");
+  }
+  const timeout = delay(5_000).then(() => {
+    if (server.exitCode === null && server.signalCode === null) {
+      if (pid) {
+        process.kill(-pid, "SIGKILL");
+      } else {
         server.kill("SIGKILL");
       }
-      resolve();
-    }, 5_000);
+    }
   });
   await Promise.race([once(server, "exit").then(() => undefined), timeout]);
+}
+
+function delay(ms: number): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, ms);
+  return promise;
 }
