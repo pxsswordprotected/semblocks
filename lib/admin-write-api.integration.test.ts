@@ -17,6 +17,8 @@ const WRITE_ENDPOINTS = [
   "/api/transcripts",
   "/api/chunks",
   "/api/sync",
+  "/api/search",
+  "/api/recommend-channel",
   "/api/jobs/ocr",
   "/api/jobs/sync",
   "/api/jobs/test-job-id/cancel",

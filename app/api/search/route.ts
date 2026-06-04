@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdminApi } from "@/lib/admin-api";
 import {
   parseChannelFilter,
   parseLimit,
@@ -17,6 +18,11 @@ import {
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  // Live search embeds the query via OpenAI, so it is owner-only. Public
+  // visitors use stored demo searches (see /api/demo-searches).
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
+
   const url = new URL(req.url);
   const q = url.searchParams.get("q");
   const sid = url.searchParams.get("sid");
@@ -53,6 +59,10 @@ export async function GET(req: Request) {
 // with the same vision pass used at index time and feed the caption
 // through `runSearch`.
 export async function POST(req: Request) {
+  // Image search captions (vision) + embeds via OpenAI, so it is owner-only.
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
+
   let body: unknown;
   try {
     body = await req.json();

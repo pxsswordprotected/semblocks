@@ -1,0 +1,13 @@
+{
+  "search": [
+    { "id": "search-embodiment", "label": "Language as an embodied, carnal phenomenon", "query": "language as an embodied, carnal phenomenon; gesture and the body as expression" },
+    { "id": "search-legibility", "label": "States making society legible", "query": "how states make society legible, standardization, central planning and its failures" },
+    { "id": "search-interface", "label": "Interface and interaction design", "query": "interface design, interaction design, affordances, how tools shape thought" },
+    { "id": "search-attention", "label": "Attention and distraction", "query": "attention, distraction, focus, the economics of attention" }
+  ],
+  "rec": [
+    { "id": "rec-design-eng", "label": "Design + engineering notes", "query": "design engineering notes, building tools, craft, systems thinking" },
+    { "id": "rec-philosophy", "label": "Phenomenology and embodiment", "query": "phenomenology, embodiment, perception, Merleau-Ponty" }
+  ],
+  "image_search": []
+}

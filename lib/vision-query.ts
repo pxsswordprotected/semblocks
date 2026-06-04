@@ -4,11 +4,11 @@
 // Server-only. NEVER import from a client component — pulls in the
 // OpenAI SDK via `lib/vision.ts`.
 
-import { parseVisionResponse, visionCaption } from "@/lib/vision";
+import { parseVisionResponse, visionCaption } from "./vision.ts";
 import {
   QUERY_IMAGE_MAX_BYTES,
   QUERY_IMAGE_MAX_DATA_URL_CHARS,
-} from "@/lib/query-image-limits";
+} from "./query-image-limits.ts";
 
 // Re-exported for caller convenience; canonical home is
 // `lib/query-image-limits.ts` (which is client-safe).

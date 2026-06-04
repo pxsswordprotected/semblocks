@@ -14,11 +14,13 @@ import type { ChannelSummary } from "../channels/types";
 type BlocksTableCardProps = {
   className?: string;
   selectedChannels?: ChannelSummary[];
+  ownerMode?: boolean;
 };
 
 export function BlocksTableCard({
   className,
   selectedChannels = [],
+  ownerMode = false,
 }: BlocksTableCardProps) {
   const [totalBlocks, setTotalBlocks] = useState(0);
 
@@ -79,7 +81,7 @@ export function BlocksTableCard({
       <div className="mt-4 h-px shrink-0 bg-stroke" />
 
       <Suspense fallback={<BlocksTableContentSkeleton />}>
-        <BlocksTableContent />
+        <BlocksTableContent ownerMode={ownerMode} />
       </Suspense>
     </Panel>
   );

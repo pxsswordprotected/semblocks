@@ -22,11 +22,15 @@ import {
 // gap is what makes the spacing under the last row consistent with
 // the spacing between rows — the divider sits flush at the end of
 // the body, then the footer follows with its own `mt-4`.
-export function BlocksTableContent() {
+export function BlocksTableContent({
+  ownerMode = false,
+}: {
+  ownerMode?: boolean;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
-  const state = useSearchHits(DEFAULT_RESULT_LIMIT);
+  const state = useSearchHits(DEFAULT_RESULT_LIMIT, ownerMode);
 
   useEffect(() => {
     if (state.status !== "ready" || state.totalCount === 0) return;
@@ -75,6 +79,15 @@ function BodyArea({
 
   if (state.status === "loading") {
     return <BlocksTableContentSkeleton renderFooterSlot={false} />;
+  }
+
+  if (state.status === "locked") {
+    return (
+      <div className="flex-1 px-6 pt-4 text-sm leading-5 text-black/50">
+        Live search needs your own OpenAI key. Clone the project and run it
+        locally, or try a demo search below.
+      </div>
+    );
   }
 
   if (state.status === "error") {

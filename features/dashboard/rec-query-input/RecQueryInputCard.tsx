@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
@@ -13,20 +13,72 @@ import type {
 
 type RecQueryInputCardProps = {
   className?: string;
+  ownerMode?: boolean;
   onStateChange?: (state: RecommendationState) => void;
 };
+
+type DemoSummary = { id: string; label: string; is_image: boolean };
+type DemoListResponse = { demos: DemoSummary[] } | { error: string };
+type DemoGetResponse =
+  | { demo: { result: RecResponse } }
+  | { error: string };
 
 const PLACEHOLDER = "Enter text to get recommended channels";
 
 export function RecQueryInputCard({
   className,
+  ownerMode = false,
   onStateChange,
 }: RecQueryInputCardProps) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demos, setDemos] = useState<DemoSummary[]>([]);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const hasText = text.trim().length > 0;
+
+  useEffect(() => {
+    if (ownerMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/demo-searches?kind=rec");
+        const body = (await res.json()) as DemoListResponse;
+        if (cancelled || !res.ok || "error" in body) return;
+        setDemos(body.demos);
+      } catch {
+        // demos optional
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerMode]);
+
+  async function pickDemo(id: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    onStateChange?.({ status: "loading", source: "text" });
+    try {
+      const res = await fetch(`/api/demo-searches/${encodeURIComponent(id)}`);
+      const body = (await res.json()) as DemoGetResponse;
+      if (!res.ok || "error" in body) {
+        throw new Error("error" in body ? body.error : `HTTP ${res.status}`);
+      }
+      onStateChange?.({
+        status: "ready",
+        source: "text",
+        result: body.demo.result,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      onStateChange?.({ status: "error", source: "text", error: msg });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function recommendFromText(e: React.FormEvent) {
     e.preventDefault();
@@ -89,6 +141,37 @@ export function RecQueryInputCard({
     }
   }
 
+  if (!ownerMode) {
+    return (
+      <Panel className={cn("flex min-w-0 flex-col px-6 py-4", className)}>
+        <p className="text-sm leading-5 text-black/60">
+          Live recommendations use an OpenAI key. Clone the project to run it on
+          your own data and key. For now, try a demo:
+        </p>
+        <div className="mt-3 flex min-h-0 flex-1 flex-wrap content-start gap-2 overflow-y-auto">
+          {demos.length === 0 ? (
+            <p className="text-sm text-black/40">No demo recommendations yet.</p>
+          ) : (
+            demos.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                disabled={busy}
+                onClick={() => void pickDemo(d.id)}
+                className="rounded-full border border-stroke px-3 py-1 text-sm text-neutral-800 hover:bg-black/5 disabled:opacity-60"
+              >
+                {d.label}
+              </button>
+            ))
+          )}
+        </div>
+        {error ? (
+          <p className="mt-2 text-sm leading-5 text-error">{error}</p>
+        ) : null}
+      </Panel>
+    );
+  }
+
   return (
     <Panel className={cn("flex min-w-0 flex-col px-6 py-4", className)}>
       <form onSubmit={recommendFromText} className="flex h-full min-w-0 flex-col gap-4">
@@ -140,14 +223,14 @@ export function RecQueryInputCard({
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") resolve(result);
-      else reject(new Error("FileReader produced non-string result"));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("read failed"));
-    reader.readAsDataURL(file);
-  });
+  const { promise, resolve, reject } = Promise.withResolvers<string>();
+  const reader = new FileReader();
+  reader.onload = () => {
+    const result = reader.result;
+    if (typeof result === "string") resolve(result);
+    else reject(new Error("FileReader produced non-string result"));
+  };
+  reader.onerror = () => reject(reader.error ?? new Error("read failed"));
+  reader.readAsDataURL(file);
+  return promise;
 }

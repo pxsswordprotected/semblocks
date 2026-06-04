@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test --test-concurrency=1 'lib/**/*.test.ts' 'features/**/*.test.ts'",
     "eval": "node --env-file=.env.local scripts/eval-search.ts",
+    "demos": "node --env-file=.env.local scripts/build-demo-searches.ts",
     "check:stale": "node scripts/check-stale.ts",
     "lint:spacing": "node scripts/check-even-spacing.ts"
   },

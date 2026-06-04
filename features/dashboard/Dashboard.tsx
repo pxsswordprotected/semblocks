@@ -42,7 +42,7 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
         <div className={`flex min-w-0 flex-1 flex-row ${DASHBOARD_TOP_CARD_GAP}`}>
           <ProfileCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} />
           <SyncCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} ownerMode={ownerMode} />
-          <SearchCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[2.3]`} />
+          <SearchCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[2.3]`} ownerMode={ownerMode} />
         </div>
       </div>
 
@@ -62,10 +62,12 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
           <BlocksTableCard
             className={`${DASHBOARD_PRIMARY_PANEL_H} min-w-0 w-full shrink-0`}
             selectedChannels={selectedChannels}
+            ownerMode={ownerMode}
           />
           <div className="flex min-h-0 min-w-0 w-full flex-1 flex-row">
             <RecQueryInputCard
               className="h-full min-w-0 flex-[1] rounded-r-none border-r-0 shadow-[-1px_0_1px_rgb(0_0_0_/_0.05),-6px_0_14px_-6px_rgb(0_0_0_/_0.12),var(--shadow-inner-base)]"
+              ownerMode={ownerMode}
               onStateChange={setRecommendation}
             />
             <RankingTableCard
