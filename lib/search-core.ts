@@ -130,8 +130,10 @@ function chooseBetter(existing: Hit | undefined, candidate: Hit): Hit {
   return candidate.distance < existing.distance ? candidate : existing;
 }
 
+export const MAX_SEARCH_LIMIT = 500;
+
 export function parseLimit(raw: string | null): number {
-  return Math.min(Math.max(Number(raw ?? 10), 1), 50);
+  return Math.min(Math.max(Number(raw ?? 10), 1), MAX_SEARCH_LIMIT);
 }
 
 // Channel-filter parser used by both GET (CSV in querystring) and POST

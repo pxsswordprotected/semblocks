@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseChannelFilter } from "./search-core.ts";
+import { MAX_SEARCH_LIMIT, parseChannelFilter, parseLimit } from "./search-core.ts";
 
 test("returns null for absent channel filters", () => {
   assert.equal(parseChannelFilter(null), null);
@@ -28,4 +28,12 @@ test("deduplicates channel ids while preserving first occurrence", () => {
 test("returns null for unsupported raw types", () => {
   assert.equal(parseChannelFilter(true), null);
   assert.equal(parseChannelFilter({ channels: [1] }), null);
+});
+
+test("parseLimit clamps search result limits to the supported range", () => {
+  assert.equal(parseLimit(null), 10);
+  assert.equal(parseLimit("104"), 104);
+  assert.equal(parseLimit("0"), 1);
+  assert.equal(parseLimit("9999"), MAX_SEARCH_LIMIT);
+  assert.equal(MAX_SEARCH_LIMIT, 500);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BlockRow } from "./BlockRow";
 import { BlocksTableContentSkeleton } from "./BlocksTableContentSkeleton";
@@ -26,21 +26,7 @@ export function BlocksTableContent() {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
-  const [resultLimit, setResultLimit] = useState(DEFAULT_RESULT_LIMIT);
-  const state = useSearchHits(resultLimit);
-
-  const setResultLimitAndResetPage = useCallback(
-    (nextLimit: number) => {
-      setResultLimit(nextLimit);
-      const next = new URLSearchParams(params);
-      next.delete("page");
-      const qs = next.toString();
-      startTransition(() => {
-        router.replace(qs ? `?${qs}` : "?", { scroll: false });
-      });
-    },
-    [params, router, startTransition],
-  );
+  const state = useSearchHits(DEFAULT_RESULT_LIMIT);
 
   useEffect(() => {
     if (state.status !== "ready" || state.totalCount === 0) return;
@@ -66,8 +52,6 @@ export function BlocksTableContent() {
         page={state.page}
         pageSize={state.pageSize}
         totalCount={state.totalCount}
-        resultLimit={resultLimit}
-        onResultLimitChange={setResultLimitAndResetPage}
       />
     </>
   );
