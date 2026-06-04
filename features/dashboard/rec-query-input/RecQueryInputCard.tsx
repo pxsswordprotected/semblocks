@@ -131,6 +131,9 @@ export function RecQueryInputCard({
         const msg = "error" in response ? response.error : `HTTP ${res.status}`;
         throw new Error(msg);
       }
+      // Surface the caption used for an image recommendation so the owner
+      // sees/edits exactly what was searched.
+      if (source === "image" && response.query) setText(response.query);
       onStateChange?.({ status: "ready", source, result: response });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

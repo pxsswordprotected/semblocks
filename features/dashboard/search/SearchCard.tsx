@@ -14,7 +14,10 @@ import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
 import { QUERY_IMAGE_MAX_BYTES } from "@/lib/query-image-limits";
 import { cn } from "@/lib/utils";
-import { putImageSearchResult } from "../blocks-table/useSearchHits";
+import {
+  getImageSearchCaption,
+  putImageSearchResult,
+} from "../blocks-table/useSearchHits";
 import type { Hit } from "@/lib/search-core";
 
 const LONG_QUERY_THRESHOLD = 300;
@@ -85,34 +88,47 @@ function SearchForm({
   const hasText = query.trim().length > 0;
   const [, startTransition] = useTransition();
 
+  // Keep the visible query in sync with the active URL source so the
+  // owner always sees exactly what's being searched (and can edit it):
+  //  - sid  → fetch the stored long query
+  //  - img  → the caption the image produced (in-memory; empty after refresh)
+  //  - q    → the raw query
+  const qParam = params ? (params.get("q") ?? "") : initialQuery;
+  const sidParam = params ? (params.get("sid") ?? "") : initialSid;
+  const imgParam = params ? (params.get("img") ?? "") : "";
   useEffect(() => {
-    if (!initialSid) {
-      setQuery(initialQuery);
+    if (sidParam) {
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/search-sessions/${encodeURIComponent(sidParam)}`,
+          );
+          const body = (await res.json()) as SearchSessionGetResponse;
+          if (cancelled) return;
+          if (!res.ok || "error" in body) {
+            throw new Error(
+              "error" in body ? body.error : `HTTP ${res.status}`,
+            );
+          }
+          setQuery(body.q);
+        } catch (err) {
+          if (!cancelled) {
+            console.error("[SearchCard] search session", err);
+            setQuery("");
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (imgParam) {
+      setQuery(getImageSearchCaption(imgParam) ?? "");
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/search-sessions/${encodeURIComponent(initialSid)}`,
-        );
-        const body = (await res.json()) as SearchSessionGetResponse;
-        if (cancelled) return;
-        if (!res.ok || "error" in body) {
-          throw new Error("error" in body ? body.error : `HTTP ${res.status}`);
-        }
-        setQuery(body.q);
-      } catch (err) {
-        if (!cancelled) {
-          console.error("[SearchCard] search session", err);
-          setQuery("");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [initialQuery, initialSid]);
+    setQuery(qParam);
+  }, [qParam, sidParam, imgParam]);
 
   // Non-owners get demo searches instead of live search.
   useEffect(() => {
@@ -198,9 +214,10 @@ function SearchForm({
       if (!res.ok || "error" in body) {
         throw new Error("error" in body ? body.error : `HTTP ${res.status}`);
       }
-      // Stash ephemerally and route to ?img=<token>; the table reads it.
-      const token = putImageSearchResult(body.hits);
-      setQuery("");
+      // Stash hits + caption ephemerally and route to ?img=<token>. The
+      // caption populates the input so the owner sees/edits what was searched.
+      const token = putImageSearchResult(body.hits, body.query);
+      setQuery(body.query);
       navigateSource("img", token);
     } catch (err) {
       console.error("[SearchCard]", err);

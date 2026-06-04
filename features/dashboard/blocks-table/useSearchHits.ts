@@ -16,17 +16,22 @@ export { DEFAULT_RESULT_LIMIT, VISIBLE_ROWS_PER_PAGE };
 const cache = new Map<string, Hit[]>();
 
 // Ephemeral owner image-search results. The query image can't live in the
-// URL, so an owner image search stashes its hits here under a random token
-// and navigates to `?img=<token>`. Refresh clears the map → the result is
-// gone (ephemeral by design), and the hook falls back to a locked state.
-const imageResults = new Map<string, Hit[]>();
+// Ephemeral owner image-search results. The query image can't live in the
+// URL, so an owner image search stashes its hits (and the caption used to
+// search) here under a random token and navigates to `?img=<token>`.
+// Refresh clears the map → the result is gone (ephemeral by design), and
+// the hook falls back to a locked state.
+const imageResults = new Map<string, { hits: Hit[]; caption: string }>();
 
-export function putImageSearchResult(hits: Hit[]): string {
+export function putImageSearchResult(hits: Hit[], caption: string): string {
   const token = crypto.randomUUID();
-  imageResults.set(token, hits);
+  imageResults.set(token, { hits, caption });
   return token;
 }
 
+export function getImageSearchCaption(token: string): string | undefined {
+  return imageResults.get(token)?.caption;
+}
 type IdleState = {
   status: "idle";
   hits: readonly [];
@@ -206,8 +211,8 @@ export function useSearchHits(
     if (source === "none") return idle(pageSize);
     if (source === "locked") return locked(pageSize);
     if (source === "img") {
-      const hits = imageResults.get(img);
-      return hits ? ready(hits, page, pageSize) : locked(pageSize);
+      const entry = imageResults.get(img);
+      return entry ? ready(entry.hits, page, pageSize) : locked(pageSize);
     }
     const cached = cache.get(key);
     return cached ? ready(cached, page, pageSize) : loading(page, pageSize);
@@ -223,8 +228,8 @@ export function useSearchHits(
       return;
     }
     if (source === "img") {
-      const hits = imageResults.get(img);
-      setState(hits ? ready(hits, page, pageSize) : locked(pageSize));
+      const entry = imageResults.get(img);
+      setState(entry ? ready(entry.hits, page, pageSize) : locked(pageSize));
       return;
     }
 

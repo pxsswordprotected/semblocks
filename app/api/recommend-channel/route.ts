@@ -74,6 +74,7 @@ export async function POST(req: Request) {
       const result = await runChannelRec(caption, knnK, channelLimit);
       return NextResponse.json({
         ...result,
+        query: caption,
         caption_meta: { ocr_text, ocr_summary },
       });
     }

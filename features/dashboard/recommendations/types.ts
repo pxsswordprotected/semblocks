@@ -38,6 +38,9 @@ export type RecResponse = {
   input_chars: number;
   channels: RecChannel[];
   related_blocks: RecRelatedBlock[];
+  // Present for image-sourced recommendations: the caption text used to
+  // search, so the UI can show/edit exactly what was queried.
+  query?: string;
   caption_meta?: RecCaptionMeta;
 };
 
