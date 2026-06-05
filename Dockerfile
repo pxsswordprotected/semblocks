@@ -31,7 +31,7 @@ ENV PORT=3000
 ENV SQLITE_PATH=/data/aresearch.db
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates yt-dlp \
   && rm -rf /var/lib/apt/lists/* \
   && mkdir -p /data
 

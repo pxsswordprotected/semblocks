@@ -15,6 +15,8 @@
 // chunks are rebuilt for vec_block_chunks.
 
 import { spawn } from "node:child_process";
+import type { ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -119,54 +121,58 @@ async function spawnYtDlp(
     url,
   ];
 
-  return new Promise((resolve, reject) => {
-    let child;
+  const { promise, resolve, reject } = Promise.withResolvers<{
+    code: number;
+    stderr: string;
+  }>();
+  let child: ChildProcessByStdio<null, Readable, Readable>;
+  try {
+    child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+  } catch (err) {
+    reject(err);
+    return promise;
+  }
+
+  let stderr = "";
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
     try {
-      child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
-    } catch (err) {
-      reject(err);
+      child.kill("SIGKILL");
+    } catch {}
+    resolve({ code: -1, stderr: stderr + "\n[timeout]" });
+  }, timeoutMs);
+
+  child.on("error", (err: NodeJS.ErrnoException) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    if (err.code === "ENOENT") {
+      reject(
+        new YtDlpMissingError(
+          "yt-dlp not found — install via 'brew install yt-dlp' or set YT_DLP_PATH",
+        ),
+      );
       return;
     }
-
-    let stderr = "";
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      try {
-        child.kill("SIGKILL");
-      } catch {}
-      resolve({ code: -1, stderr: stderr + "\n[timeout]" });
-    }, timeoutMs);
-
-    child.on("error", (err: NodeJS.ErrnoException) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (err.code === "ENOENT") {
-        reject(
-          new YtDlpMissingError(
-            "yt-dlp not found — install via 'brew install yt-dlp' or set YT_DLP_PATH",
-          ),
-        );
-        return;
-      }
-      reject(err);
-    });
-
-    child.stderr.on("data", (b: Buffer) => {
-      stderr += b.toString("utf8");
-    });
-    // Drain stdout so the pipe doesn't backpressure.
-    child.stdout.on("data", () => {});
-
-    child.on("close", (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ code: code ?? -1, stderr });
-    });
+    reject(err);
   });
+
+  child.stderr.on("data", (b: Buffer) => {
+    stderr += b.toString("utf8");
+  });
+  // Drain stdout so the pipe doesn't backpressure.
+  child.stdout.on("data", () => {});
+
+  child.on("close", (code) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    resolve({ code: code ?? -1, stderr });
+  });
+
+  return promise;
 }
 
 function classifyStderr(stderr: string): "persistent" | "retryable" {
