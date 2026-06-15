@@ -1,13 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { Funnel } from "@phosphor-icons/react/dist/ssr";
-import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
 import { BlocksTableContent } from "./BlocksTableContent";
 import { BlocksTableContentSkeleton } from "./BlocksTableContentSkeleton";
 import { BLOCK_GRID_CLASS, BLOCK_GRID_COLUMNS } from "./columns";
+import { FilterMenuButton } from "./FilterMenuButton";
 import type { ChannelSummary } from "../channels/types";
 
 
@@ -55,13 +54,7 @@ export function BlocksTableCard({
           <span className="text-black/50">Blocks for: </span>
           {heading}
         </h2>
-        <Button
-          type="button"
-          aria-label="Filter blocks"
-          className="absolute top-1/2 right-6 flex h-9 w-9 -translate-y-1/2 items-center justify-center px-0 py-0"
-        >
-          <Funnel size={22} weight="bold" />
-        </Button>
+        <FilterMenuButton />
       </header>
 
       <div className="mt-4 h-px shrink-0 bg-stroke" />
@@ -86,6 +79,7 @@ export function BlocksTableCard({
     </Panel>
   );
 }
+
 
 function formatBlocksFor(
   channels: ChannelSummary[],

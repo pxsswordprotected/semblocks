@@ -2,6 +2,8 @@
 // scripts (e.g. evals) can call runSearch without booting Next.
 import { getDb } from "./db.ts";
 import { embed } from "./embeddings.ts";
+import { EMPTY_SEARCH_FILTER_OPTIONS } from "./search-filters.ts";
+import type { SearchFilterOptions } from "./search-filters.ts";
 
 export type Hit = {
   block_id: number;
@@ -172,6 +174,7 @@ export async function runSearch(
   qText: string,
   limit: number,
   channels: number[] | null,
+  filters: SearchFilterOptions = EMPTY_SEARCH_FILTER_OPTIONS,
 ): Promise<Hit[]> {
   const qNorm = normalize(qText);
   const tokens = tokenize(qNorm);
@@ -182,22 +185,30 @@ export async function runSearch(
   const db = getDb();
   const baseBlockK = Math.max(limit * 4, 20);
   const baseChunkK = Math.max(limit * 8, 50);
+  const blockTypes = filters.blockTypes ?? [];
+  const typeFiltered = blockTypes.length > 0;
+  const typeInList = blockTypes.map(() => "?").join(",");
 
   // When the channel filter is active we either push it down into the
   // KNN scan (Path A) or over-fetch and post-filter (Path B). See the
   // USE_FALLBACK comment above for the verification record.
-  const filtered = channels !== null && channels.length > 0;
+  const channelFiltered = channels !== null && channels.length > 0;
   let blockRows: BlockHitRow[];
   let chunkRows: ChunkHitRow[];
 
-  if (!filtered) {
+  if (!channelFiltered) {
     blockRows = db
       .prepare(
-        `WITH knn AS MATERIALIZED (
+        `WITH ${typeFiltered ? `allowed AS (
+            SELECT id AS block_id
+              FROM blocks
+             WHERE block_type IN (${typeInList})
+          ),` : ""} knn AS MATERIALIZED (
             SELECT block_id, distance
               FROM vec_blocks
              WHERE embedding MATCH ?
                AND k = ?
+               ${typeFiltered ? "AND block_id IN (SELECT block_id FROM allowed)" : ""}
           )
           SELECT
             knn.block_id     AS block_id,
@@ -218,15 +229,21 @@ export async function runSearch(
           GROUP BY knn.block_id
           ORDER BY knn.distance`,
       )
-      .all(vector, baseBlockK) as BlockHitRow[];
+      .all(...blockTypes, vector, baseBlockK) as BlockHitRow[];
 
     chunkRows = db
       .prepare(
-        `WITH knn AS MATERIALIZED (
+        `WITH ${typeFiltered ? `allowed_chunks AS (
+            SELECT ch.id AS chunk_id
+              FROM block_chunks ch
+              JOIN blocks b ON b.id = ch.block_id
+             WHERE b.block_type IN (${typeInList})
+          ),` : ""} knn AS MATERIALIZED (
             SELECT chunk_id, distance
               FROM vec_block_chunks
              WHERE embedding MATCH ?
                AND k = ?
+               ${typeFiltered ? "AND chunk_id IN (SELECT chunk_id FROM allowed_chunks)" : ""}
           )
           SELECT
             ch.block_id             AS block_id,
@@ -251,7 +268,7 @@ export async function runSearch(
           GROUP BY knn.chunk_id
           ORDER BY knn.distance`,
       )
-      .all(vector, baseChunkK) as ChunkHitRow[];
+      .all(...blockTypes, vector, baseChunkK) as ChunkHitRow[];
   } else if (!USE_FALLBACK) {
     // Path A — pushdown. Allowed-block CTE is materialized once and
     // referenced from the vec0 WHERE clause; sqlite-vec 0.1.6 honors
@@ -260,9 +277,11 @@ export async function runSearch(
     blockRows = db
       .prepare(
         `WITH allowed AS (
-            SELECT DISTINCT block_id
-              FROM block_channels
-             WHERE channel_id IN (${inList})
+            SELECT DISTINCT bc.block_id
+              FROM block_channels bc
+              ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+             WHERE bc.channel_id IN (${inList})
+               ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}
           ),
           knn AS MATERIALIZED (
             SELECT block_id, distance
@@ -290,18 +309,21 @@ export async function runSearch(
           GROUP BY knn.block_id
           ORDER BY knn.distance`,
       )
-      .all(...channels, vector, baseBlockK) as BlockHitRow[];
+      .all(...channels, ...blockTypes, vector, baseBlockK) as BlockHitRow[];
 
     chunkRows = db
       .prepare(
-        `WITH allowed_chunks AS (
-            SELECT bc.id AS chunk_id
-              FROM block_chunks bc
-             WHERE bc.block_id IN (
-               SELECT DISTINCT block_id
-                 FROM block_channels
-                WHERE channel_id IN (${inList})
-             )
+        `WITH allowed_blocks AS (
+            SELECT DISTINCT bc.block_id
+              FROM block_channels bc
+              ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+             WHERE bc.channel_id IN (${inList})
+               ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}
+          ),
+          allowed_chunks AS (
+            SELECT ch.id AS chunk_id
+              FROM block_chunks ch
+             WHERE ch.block_id IN (SELECT block_id FROM allowed_blocks)
           ),
           knn AS MATERIALIZED (
             SELECT chunk_id, distance
@@ -333,7 +355,7 @@ export async function runSearch(
           GROUP BY knn.chunk_id
           ORDER BY knn.distance`,
       )
-      .all(...channels, vector, baseChunkK) as ChunkHitRow[];
+      .all(...channels, ...blockTypes, vector, baseChunkK) as ChunkHitRow[];
   } else {
     // Path B — fallback. Run the unfiltered KNN with inflated k, gather
     // allowed block ids in JS, and drop everything else. Correct for any
@@ -351,10 +373,13 @@ export async function runSearch(
     const allowedIds = new Set<number>(
       (db
         .prepare(
-          `SELECT DISTINCT block_id FROM block_channels
-            WHERE channel_id IN (${inList})`,
+          `SELECT DISTINCT bc.block_id
+             FROM block_channels bc
+             ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+            WHERE bc.channel_id IN (${inList})
+              ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}`,
         )
-        .all(...channels) as Array<{ block_id: number }>).map(
+        .all(...channels, ...blockTypes) as Array<{ block_id: number }>).map(
         (r) => r.block_id,
       ),
     );

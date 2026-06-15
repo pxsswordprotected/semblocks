@@ -6,6 +6,12 @@ import {
   runSearch,
 } from "@/lib/search-core";
 import {
+  SearchFilterValidationError,
+  parseSearchFiltersFromApiBody,
+  parseSearchFiltersFromApiQuery,
+} from "@/lib/search-filters";
+import type { SearchFilterOptions } from "@/lib/search-filters";
+import {
   ImageQueryError,
   QUERY_IMAGE_MAX_DATA_URL_CHARS,
   captionImageForQuery,
@@ -28,6 +34,15 @@ export async function GET(req: Request) {
   const sid = url.searchParams.get("sid");
   const limit = parseLimit(url.searchParams.get("k"));
   const channels = parseChannelFilter(url.searchParams.get("channels"));
+  let filters: SearchFilterOptions;
+  try {
+    filters = parseSearchFiltersFromApiQuery(url.searchParams);
+  } catch (err) {
+    if (err instanceof SearchFilterValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
 
   let query: string;
   try {
@@ -47,7 +62,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const hits = await runSearch(query, limit, channels);
+    const hits = await runSearch(query, limit, channels, filters);
     return NextResponse.json({ query, hits });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -77,7 +92,17 @@ export async function POST(req: Request) {
     image_data_url?: unknown;
     k?: unknown;
     channels?: unknown;
+    types?: unknown;
   };
+  let filters: SearchFilterOptions;
+  try {
+    filters = parseSearchFiltersFromApiBody(body as { types?: unknown });
+  } catch (err) {
+    if (err instanceof SearchFilterValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
+  }
   if (typeof image_data_url !== "string" || !image_data_url) {
     return NextResponse.json(
       { error: "image_data_url is required" },
@@ -95,7 +120,7 @@ export async function POST(req: Request) {
   try {
     const { caption, ocr_text, ocr_summary } =
       await captionImageForQuery(image_data_url);
-    const hits = await runSearch(caption, limit, channels);
+    const hits = await runSearch(caption, limit, channels, filters);
     return NextResponse.json({
       query: caption,
       caption_meta: { ocr_text, ocr_summary },

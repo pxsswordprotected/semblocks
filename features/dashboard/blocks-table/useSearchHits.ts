@@ -7,6 +7,11 @@ import {
   DEFAULT_RESULT_LIMIT,
   VISIBLE_ROWS_PER_PAGE,
 } from "./resultLimit";
+import {
+  appendSearchFiltersToParams,
+  parseSearchFilters,
+  searchFiltersKey,
+} from "./searchFilters";
 
 export { DEFAULT_RESULT_LIMIT, VISIBLE_ROWS_PER_PAGE };
 
@@ -16,16 +21,23 @@ export { DEFAULT_RESULT_LIMIT, VISIBLE_ROWS_PER_PAGE };
 const cache = new Map<string, Hit[]>();
 
 // Ephemeral owner image-search results. The query image can't live in the
-// Ephemeral owner image-search results. The query image can't live in the
 // URL, so an owner image search stashes its hits (and the caption used to
 // search) here under a random token and navigates to `?img=<token>`.
 // Refresh clears the map → the result is gone (ephemeral by design), and
-// the hook falls back to a locked state.
-const imageResults = new Map<string, { hits: Hit[]; caption: string }>();
+// the hook falls back to a locked state. The filter key records which
+// server-side filters were applied when the image search was created.
+const imageResults = new Map<
+  string,
+  { hits: Hit[]; caption: string; filterKey: string }
+>();
 
-export function putImageSearchResult(hits: Hit[], caption: string): string {
+export function putImageSearchResult(
+  hits: Hit[],
+  caption: string,
+  filterKey = searchFiltersKey({ blockTypes: [] }),
+): string {
   const token = crypto.randomUUID();
-  imageResults.set(token, { hits, caption });
+  imageResults.set(token, { hits, caption, filterKey });
   return token;
 }
 
@@ -200,9 +212,11 @@ export function useSearchHits(
           : "locked"
         : "none";
 
+  const filters = parseSearchFilters(params);
+  const filterKey = searchFiltersKey(filters);
   const key = demo
     ? `demo:${demo}`
-    : `${sid ? `sid:${sid}` : `q:${q}`}|channels:${channels}|k:${safeResultLimit}`;
+    : `${sid ? `sid:${sid}` : `q:${q}`}|channels:${channels}|k:${safeResultLimit}|${filterKey}`;
 
   // Bumping this counter re-runs the fetch effect for retry.
   const [retryNonce, setRetryNonce] = useState(0);
@@ -212,7 +226,10 @@ export function useSearchHits(
     if (source === "locked") return locked(pageSize);
     if (source === "img") {
       const entry = imageResults.get(img);
-      return entry ? ready(entry.hits, page, pageSize) : locked(pageSize);
+      if (!entry) return locked(pageSize);
+      return entry.filterKey === filterKey
+        ? ready(entry.hits, page, pageSize)
+        : fail("Image search filters changed. Search by image again.", page, pageSize);
     }
     const cached = cache.get(key);
     return cached ? ready(cached, page, pageSize) : loading(page, pageSize);
@@ -229,7 +246,17 @@ export function useSearchHits(
     }
     if (source === "img") {
       const entry = imageResults.get(img);
-      setState(entry ? ready(entry.hits, page, pageSize) : locked(pageSize));
+      setState(
+        !entry
+          ? locked(pageSize)
+          : entry.filterKey === filterKey
+            ? ready(entry.hits, page, pageSize)
+            : fail(
+                "Image search filters changed. Search by image again.",
+                page,
+                pageSize,
+              ),
+      );
       return;
     }
 
@@ -253,6 +280,7 @@ export function useSearchHits(
                 else rp.set("q", q);
                 rp.set("k", String(safeResultLimit));
                 if (channels) rp.set("channels", channels);
+                appendSearchFiltersToParams(rp, filters);
                 return `/api/search?${rp.toString()}`;
               })();
 
@@ -283,6 +311,7 @@ export function useSearchHits(
     page,
     pageSize,
     safeResultLimit,
+    filterKey,
     key,
     retryNonce,
   ]);

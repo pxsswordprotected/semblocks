@@ -18,6 +18,11 @@ import {
   getImageSearchCaption,
   putImageSearchResult,
 } from "../blocks-table/useSearchHits";
+import {
+  parseSearchFilters,
+  searchFiltersKey,
+  searchFiltersToRequestBody,
+} from "../blocks-table/searchFilters";
 import type { Hit } from "@/lib/search-core";
 
 const LONG_QUERY_THRESHOLD = 300;
@@ -222,10 +227,17 @@ function SearchForm({
     setSearching(true);
     try {
       const dataUrl = await readFileAsDataUrl(file);
+      const currentParams = new URLSearchParams(params ?? undefined);
+      const channels = (currentParams.get("channels") ?? "").trim();
+      const filters = parseSearchFilters(currentParams);
       const res = await fetch(`/api/search`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ image_data_url: dataUrl }),
+        body: JSON.stringify({
+          image_data_url: dataUrl,
+          ...(channels ? { channels } : {}),
+          ...searchFiltersToRequestBody(filters),
+        }),
       });
       const body = (await res.json()) as ImageSearchResponse;
       if (!res.ok || "error" in body) {
@@ -233,7 +245,11 @@ function SearchForm({
       }
       // Stash hits + caption ephemerally and route to ?img=<token>. The
       // caption populates the input so the owner sees/edits what was searched.
-      const token = putImageSearchResult(body.hits, body.query);
+      const token = putImageSearchResult(
+        body.hits,
+        body.query,
+        searchFiltersKey(filters),
+      );
       setQuery(body.query);
       navigateSource("img", token);
     } catch (err) {
