@@ -1,4 +1,5 @@
 import {
+  BLOCK_TYPE_FILTERS,
   EMPTY_SEARCH_FILTER_OPTIONS,
   parseBlockTypeFiltersLenient,
   searchFiltersCacheKey,
@@ -24,6 +25,26 @@ export function parseSearchFilters(params: SearchParamReader): SearchFilters {
   return {
     blockTypes: parseBlockTypeFiltersLenient(params.get("types")),
   };
+}
+
+export function toggleBlockTypeFilter(
+  filters: SearchFilters,
+  blockType: BlockTypeFilter,
+): SearchFilters {
+  const selected = new Set(filters.blockTypes);
+  if (selected.has(blockType)) selected.delete(blockType);
+  else selected.add(blockType);
+
+  return {
+    blockTypes: BLOCK_TYPE_FILTERS.filter((type) => selected.has(type)),
+  };
+}
+
+export function searchFiltersEqual(
+  a: SearchFilters,
+  b: SearchFilters,
+): boolean {
+  return searchFiltersKey(a) === searchFiltersKey(b);
 }
 
 export function serializeSearchFilters(

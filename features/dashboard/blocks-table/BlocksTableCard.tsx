@@ -54,7 +54,7 @@ export function BlocksTableCard({
           <span className="text-black/50">Blocks for: </span>
           {heading}
         </h2>
-        <FilterMenuButton />
+        <FilterMenuButton ownerMode={ownerMode} />
       </header>
 
       <div className="mt-4 h-px shrink-0 bg-stroke" />

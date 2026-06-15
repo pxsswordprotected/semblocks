@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import {
   appendSearchFiltersToParams,
   parseSearchFilters,
+  searchFiltersEqual,
   searchFiltersKey,
   serializeSearchFilters,
+  toggleBlockTypeFilter,
 } from "./searchFilters.ts";
 
 test("parseSearchFilters returns empty filters for no params", () => {
@@ -68,4 +70,65 @@ test("searchFiltersKey is stable and distinguishes values", () => {
     searchFiltersKey({ blockTypes: ["Image"] }),
     searchFiltersKey({ blockTypes: ["Link"] }),
   );
+});
+
+test("toggleBlockTypeFilter adds a block type when absent", () => {
+  assert.deepEqual(toggleBlockTypeFilter({ blockTypes: [] }, "Image"), {
+    blockTypes: ["Image"],
+  });
+});
+
+test("toggleBlockTypeFilter removes a block type when present", () => {
+  assert.deepEqual(toggleBlockTypeFilter({ blockTypes: ["Image"] }, "Image"), {
+    blockTypes: [],
+  });
+});
+
+test("toggleBlockTypeFilter preserves canonical ordering", () => {
+  assert.deepEqual(toggleBlockTypeFilter({ blockTypes: ["Link"] }, "Image"), {
+    blockTypes: ["Image", "Link"],
+  });
+  assert.deepEqual(
+    toggleBlockTypeFilter({ blockTypes: ["Embed", "Text"] }, "Attachment"),
+    { blockTypes: ["Text", "Attachment", "Embed"] },
+  );
+});
+
+test("toggleBlockTypeFilter does not mutate the original filters object", () => {
+  const original = { blockTypes: ["Link"] as const };
+  const next = toggleBlockTypeFilter(original, "Image");
+
+  assert.deepEqual(original, { blockTypes: ["Link"] });
+  assert.deepEqual(next, { blockTypes: ["Image", "Link"] });
+});
+
+test("searchFiltersEqual compares canonical filter values", () => {
+  assert.equal(
+    searchFiltersEqual({ blockTypes: ["Image"] }, { blockTypes: ["Image"] }),
+    true,
+  );
+  assert.equal(
+    searchFiltersEqual({ blockTypes: ["Image"] }, { blockTypes: ["Link"] }),
+    false,
+  );
+  assert.equal(
+    searchFiltersEqual({ blockTypes: [] }, { blockTypes: [] }),
+    true,
+  );
+});
+
+test("serializeSearchFilters drops unknown URL values on next serialization", () => {
+  const params = serializeSearchFilters(
+    new URLSearchParams("q=test&types=Image,Bad,Embed"),
+    { blockTypes: ["Image", "Embed"] },
+  );
+  assert.equal(params.get("types"), "Image,Embed");
+});
+
+test("serializeSearchFilters canonicalizes case and whitespace variants", () => {
+  const params = serializeSearchFilters(
+    new URLSearchParams("q=test&types=image,%20Link"),
+    { blockTypes: ["Image", "Link"] },
+  );
+  assert.equal(params.get("types"), "Image,Link");
 });
