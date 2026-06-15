@@ -25,10 +25,9 @@ import {
 } from "./searchFilters";
 import { BlockTypeFilter } from "./filters/BlockTypeFilter";
 
-const FILTER_MENU_WIDTH = 200;
+const FILTER_MENU_WIDTH = 300;
 const FILTER_MENU_HEIGHT = 400;
 const FILTER_MENU_SHADOW = "0 6px 18px rgba(0,0,0,0.08)";
-
 
 type FilterMenuButtonProps = {
   ownerMode?: boolean;
@@ -66,7 +65,6 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
     duration: { open: 0, close: 150 },
   });
 
-
   function applyFilters() {
     if (applyDisabled) return;
     const nextParams = serializeSearchFilters(
@@ -101,7 +99,7 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
             <div
               data-status={status}
               className={cn(
-                "flex flex-col overflow-hidden rounded-[1px] border border-black/10",
+                "flex select-none flex-col overflow-hidden rounded-[1px] border border-black/10",
                 "bg-dashboard bg-[image:var(--gradient-panel)] font-sans text-black",
                 "transition-opacity duration-0 ease-[var(--ease-out-quad)]",
                 "will-change-[opacity]",
@@ -118,7 +116,7 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
                 Filters
               </div>
               {ownerMode ? (
-                <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
+                <div className="relative flex min-h-0 flex-1 flex-col px-3 py-3 pb-16">
                   <BlockTypeFilter
                     value={draftFilters.blockTypes}
                     onChange={(blockTypes) =>
@@ -128,7 +126,7 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
                   <Button
                     type="button"
                     disabled={applyDisabled}
-                    className="mt-4 h-9 w-full"
+                    className="absolute right-3 bottom-3 left-3 h-9"
                     onClick={applyFilters}
                   >
                     Apply filters
@@ -146,4 +144,3 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
     </>
   );
 }
-

@@ -1,6 +1,7 @@
 "use client";
 
-import { type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
+import { CaretDown, CaretUp } from "@phosphor-icons/react/dist/ssr";
 import {
   BLOCK_TYPE_FILTERS,
   type BlockTypeFilter as BlockTypeFilterValue,
@@ -24,27 +25,41 @@ type BlockTypeFilterProps = {
 };
 
 export function BlockTypeFilter({ value, onChange }: BlockTypeFilterProps) {
+  const [expanded, setExpanded] = useState(true);
+
   function toggleType(blockType: BlockTypeFilterValue) {
     const next = toggleBlockTypeFilter({ blockTypes: value }, blockType);
     onChange(next.blockTypes);
   }
+  const Chevron = expanded ? CaretDown : CaretUp;
 
   return (
     <>
-      <div className="font-[Arial] text-base leading-5 text-neutral-800">
-        Block types
-      </div>
-      <div className="mt-3 flex flex-col gap-1">
-        {BLOCK_TYPE_FILTERS.map((blockType) => (
-          <BlockTypeFilterOption
-            key={blockType}
-            label={blockType}
-            selected={value.includes(blockType)}
-            onClick={() => toggleType(blockType)}
-          />
-        ))}
-      </div>
-      <div className="mt-4 h-px w-full shrink-0 bg-stroke" />
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="block-type-filter-options"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-2 font-[Arial] text-base leading-5 text-neutral-800"
+      >
+        <span>Block types</span>
+        <Chevron size={16} weight="bold" aria-hidden="true" />
+      </button>
+      {expanded ? (
+        <div
+          id="block-type-filter-options"
+          className="mt-3 flex flex-col gap-1"
+        >
+          {BLOCK_TYPE_FILTERS.map((blockType) => (
+            <BlockTypeFilterOption
+              key={blockType}
+              label={blockType}
+              selected={value.includes(blockType)}
+              onClick={() => toggleType(blockType)}
+            />
+          ))}
+        </div>
+      ) : null}
     </>
   );
 }
@@ -71,13 +86,13 @@ function BlockTypeFilterOption({
       {selected ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-y-0.5 -left-2 -right-2 rounded-base"
+          className="pointer-events-none absolute inset-y-0 -left-2 -right-2 rounded-base"
           style={SELECTED_FILTER_ROW_STYLE}
         />
       ) : (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-y-0.5 -left-2 -right-2 rounded-base bg-black/5 opacity-0 transition-opacity group-hover:opacity-100"
+          className="pointer-events-none absolute inset-y-0 -left-2 -right-2 rounded-base bg-black/5 opacity-0 transition-opacity group-hover:opacity-100"
         />
       )}
       <span className="relative z-10 min-w-0 truncate">{label}</span>

@@ -364,14 +364,14 @@ function ChannelRow({
       {selected ? (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-y-0.5 -left-2 -right-2 rounded-base"
+          className="pointer-events-none absolute inset-y-0 -left-2 -right-2 rounded-base"
           style={SELECTED_ROW_STYLE}
         />
       ) : (
         <span
           aria-hidden="true"
           className={cn(
-            "pointer-events-none absolute -inset-y-0.5 -left-2 -right-2 rounded-base bg-black/5 opacity-0 transition-opacity group-hover:opacity-100",
+            "pointer-events-none absolute inset-y-0 -left-2 -right-2 rounded-base bg-black/5 opacity-0 transition-opacity group-hover:opacity-100",
             disabled && "group-hover:opacity-0",
           )}
         />
