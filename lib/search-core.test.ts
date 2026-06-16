@@ -6,6 +6,7 @@ import {
   SearchFilterValidationError,
   parseSearchFiltersFromApiBody,
   parseSearchFiltersFromApiQuery,
+  resolveDateAddedRange,
 } from "./search-filters.ts";
 
 test("returns null for absent channel filters", () => {
@@ -46,17 +47,22 @@ test("parseLimit clamps search result limits to the supported range", () => {
 test("server search filter parser returns empty options when absent", () => {
   assert.deepEqual(parseSearchFiltersFromApiQuery(new URLSearchParams()), {
     blockTypes: [],
+    dateAdded: { preset: "any" },
   });
-  assert.deepEqual(parseSearchFiltersFromApiBody({}), { blockTypes: [] });
+  assert.deepEqual(parseSearchFiltersFromApiBody({}), {
+    blockTypes: [],
+    dateAdded: { preset: "any" },
+  });
 });
 
 test("server search filter parser accepts valid and repeated block types", () => {
   assert.deepEqual(
     parseSearchFiltersFromApiQuery(new URLSearchParams("types=Image,Link,Image")),
-    { blockTypes: ["Image", "Link"] },
+    { blockTypes: ["Image", "Link"], dateAdded: { preset: "any" } },
   );
   assert.deepEqual(parseSearchFiltersFromApiBody({ types: ["text", "Image"] }), {
     blockTypes: ["Image", "Text"],
+    dateAdded: { preset: "any" },
   });
 });
 
@@ -80,4 +86,75 @@ test("server search filter parser rejects unsupported raw types", () => {
     () => parseSearchFiltersFromApiBody({ types: [1] }),
     SearchFilterValidationError,
   );
+});
+
+test("server search filter parser accepts date presets and custom ranges", () => {
+  assert.deepEqual(
+    parseSearchFiltersFromApiQuery(new URLSearchParams("date=past_week")),
+    { blockTypes: [], dateAdded: { preset: "past_week" } },
+  );
+  assert.deepEqual(
+    parseSearchFiltersFromApiQuery(
+      new URLSearchParams("date=custom&dateFrom=2026-01-01&dateTo=2026-06-15"),
+    ),
+    {
+      blockTypes: [],
+      dateAdded: { preset: "custom", from: "2026-01-01", to: "2026-06-15" },
+    },
+  );
+  assert.deepEqual(
+    parseSearchFiltersFromApiBody({
+      date: { preset: "custom", from: "2026-01-01", to: "2026-06-15" },
+    }),
+    {
+      blockTypes: [],
+      dateAdded: { preset: "custom", from: "2026-01-01", to: "2026-06-15" },
+    },
+  );
+});
+
+test("server search filter parser rejects invalid date filters", () => {
+  assert.throws(
+    () => parseSearchFiltersFromApiQuery(new URLSearchParams("date=nope")),
+    SearchFilterValidationError,
+  );
+  assert.throws(
+    () => parseSearchFiltersFromApiQuery(new URLSearchParams("date=custom")),
+    SearchFilterValidationError,
+  );
+  assert.throws(
+    () =>
+      parseSearchFiltersFromApiQuery(
+        new URLSearchParams("date=custom&dateFrom=2026-06-15&dateTo=2026-01-01"),
+      ),
+    SearchFilterValidationError,
+  );
+  assert.throws(
+    () =>
+      parseSearchFiltersFromApiBody({
+        date: { preset: "custom", from: "bad", to: "2026-06-15" },
+      }),
+    SearchFilterValidationError,
+  );
+});
+
+test("resolveDateAddedRange resolves presets against UTC dates", () => {
+  const now = new Date("2026-06-15T20:30:00Z");
+  assert.deepEqual(resolveDateAddedRange({ preset: "past_week" }, now), {
+    from: "2026-06-08",
+  });
+  assert.deepEqual(resolveDateAddedRange({ preset: "past_month" }, now), {
+    from: "2026-05-15",
+  });
+  assert.deepEqual(resolveDateAddedRange({ preset: "past_year" }, now), {
+    from: "2025-06-15",
+  });
+  assert.deepEqual(
+    resolveDateAddedRange(
+      { preset: "custom", from: "2026-01-01", to: "2026-06-15" },
+      now,
+    ),
+    { from: "2026-01-01", to: "2026-06-15" },
+  );
+  assert.equal(resolveDateAddedRange({ preset: "any" }, now), null);
 });

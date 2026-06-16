@@ -24,6 +24,7 @@ import {
   serializeSearchFilters,
 } from "./searchFilters";
 import { BlockTypeFilter } from "./filters/BlockTypeFilter";
+import { DateAddedFilter } from "./filters/DateAddedFilter";
 
 const FILTER_MENU_WIDTH = 300;
 const FILTER_MENU_HEIGHT = 400;
@@ -54,7 +55,14 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
     strategy: "fixed",
   });
   const click = useClick(context);
-  const dismiss = useDismiss(context, { escapeKey: true, outsidePress: true });
+  const dismiss = useDismiss(context, {
+    escapeKey: true,
+    outsidePress: (event) =>
+      !(
+        event.target instanceof Element &&
+        event.target.closest("[data-filter-popover]")
+      ),
+  });
   const role = useRole(context, { role: "dialog" });
   const { getReferenceProps, getFloatingProps } = useInteractions([
     click,
@@ -117,12 +125,26 @@ export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
               </div>
               {ownerMode ? (
                 <div className="relative flex min-h-0 flex-1 flex-col px-3 py-3 pb-16">
-                  <BlockTypeFilter
-                    value={draftFilters.blockTypes}
-                    onChange={(blockTypes) =>
-                      setDraftFilters((current) => ({ ...current, blockTypes }))
-                    }
-                  />
+                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <BlockTypeFilter
+                      value={draftFilters.blockTypes}
+                      onChange={(blockTypes) =>
+                        setDraftFilters((current) => ({
+                          ...current,
+                          blockTypes,
+                        }))
+                      }
+                    />
+                    <DateAddedFilter
+                      value={draftFilters.dateAdded}
+                      onChange={(dateAdded) =>
+                        setDraftFilters((current) => ({
+                          ...current,
+                          dateAdded,
+                        }))
+                      }
+                    />
+                  </div>
                   <Button
                     type="button"
                     disabled={applyDisabled}

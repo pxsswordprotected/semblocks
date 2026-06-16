@@ -2,7 +2,7 @@
 // scripts (e.g. evals) can call runSearch without booting Next.
 import { getDb } from "./db.ts";
 import { embed } from "./embeddings.ts";
-import { EMPTY_SEARCH_FILTER_OPTIONS } from "./search-filters.ts";
+import { EMPTY_SEARCH_FILTER_OPTIONS, resolveDateAddedRange } from "./search-filters.ts";
 import type { SearchFilterOptions } from "./search-filters.ts";
 
 export type Hit = {
@@ -188,6 +188,18 @@ export async function runSearch(
   const blockTypes = filters.blockTypes ?? [];
   const typeFiltered = blockTypes.length > 0;
   const typeInList = blockTypes.map(() => "?").join(",");
+  const dateRange = resolveDateAddedRange(filters.dateAdded);
+  const dateFiltered = dateRange !== null;
+  const blockFiltered = typeFiltered || dateFiltered;
+  const blockTypeClause = typeFiltered ? `AND b.block_type IN (${typeInList})` : "";
+  const blockDateClause = dateRange
+    ? `AND date(b.created_at) >= date(?)${dateRange.to ? "\n               AND date(b.created_at) <= date(?)" : ""}`
+    : "";
+  const blockFilterParams = dateRange
+    ? dateRange.to
+      ? [...blockTypes, dateRange.from, dateRange.to]
+      : [...blockTypes, dateRange.from]
+    : [...blockTypes];
 
   // When the channel filter is active we either push it down into the
   // KNN scan (Path A) or over-fetch and post-filter (Path B). See the
@@ -199,16 +211,18 @@ export async function runSearch(
   if (!channelFiltered) {
     blockRows = db
       .prepare(
-        `WITH ${typeFiltered ? `allowed AS (
-            SELECT id AS block_id
-              FROM blocks
-             WHERE block_type IN (${typeInList})
+        `WITH ${blockFiltered ? `allowed AS (
+            SELECT b.id AS block_id
+              FROM blocks b
+             WHERE 1 = 1
+               ${blockTypeClause}
+               ${blockDateClause}
           ),` : ""} knn AS MATERIALIZED (
             SELECT block_id, distance
               FROM vec_blocks
              WHERE embedding MATCH ?
                AND k = ?
-               ${typeFiltered ? "AND block_id IN (SELECT block_id FROM allowed)" : ""}
+               ${blockFiltered ? "AND block_id IN (SELECT block_id FROM allowed)" : ""}
           )
           SELECT
             knn.block_id     AS block_id,
@@ -229,21 +243,23 @@ export async function runSearch(
           GROUP BY knn.block_id
           ORDER BY knn.distance`,
       )
-      .all(...blockTypes, vector, baseBlockK) as BlockHitRow[];
+      .all(...blockFilterParams, vector, baseBlockK) as BlockHitRow[];
 
     chunkRows = db
       .prepare(
-        `WITH ${typeFiltered ? `allowed_chunks AS (
+        `WITH ${blockFiltered ? `allowed_chunks AS (
             SELECT ch.id AS chunk_id
               FROM block_chunks ch
               JOIN blocks b ON b.id = ch.block_id
-             WHERE b.block_type IN (${typeInList})
+             WHERE 1 = 1
+               ${blockTypeClause}
+               ${blockDateClause}
           ),` : ""} knn AS MATERIALIZED (
             SELECT chunk_id, distance
               FROM vec_block_chunks
              WHERE embedding MATCH ?
                AND k = ?
-               ${typeFiltered ? "AND chunk_id IN (SELECT chunk_id FROM allowed_chunks)" : ""}
+               ${blockFiltered ? "AND chunk_id IN (SELECT chunk_id FROM allowed_chunks)" : ""}
           )
           SELECT
             ch.block_id             AS block_id,
@@ -268,7 +284,7 @@ export async function runSearch(
           GROUP BY knn.chunk_id
           ORDER BY knn.distance`,
       )
-      .all(...blockTypes, vector, baseChunkK) as ChunkHitRow[];
+      .all(...blockFilterParams, vector, baseChunkK) as ChunkHitRow[];
   } else if (!USE_FALLBACK) {
     // Path A — pushdown. Allowed-block CTE is materialized once and
     // referenced from the vec0 WHERE clause; sqlite-vec 0.1.6 honors
@@ -279,9 +295,10 @@ export async function runSearch(
         `WITH allowed AS (
             SELECT DISTINCT bc.block_id
               FROM block_channels bc
-              ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+              ${blockFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
              WHERE bc.channel_id IN (${inList})
-               ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}
+               ${blockTypeClause}
+               ${blockDateClause}
           ),
           knn AS MATERIALIZED (
             SELECT block_id, distance
@@ -309,16 +326,17 @@ export async function runSearch(
           GROUP BY knn.block_id
           ORDER BY knn.distance`,
       )
-      .all(...channels, ...blockTypes, vector, baseBlockK) as BlockHitRow[];
+      .all(...channels, ...blockFilterParams, vector, baseBlockK) as BlockHitRow[];
 
     chunkRows = db
       .prepare(
         `WITH allowed_blocks AS (
             SELECT DISTINCT bc.block_id
               FROM block_channels bc
-              ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+              ${blockFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
              WHERE bc.channel_id IN (${inList})
-               ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}
+               ${blockTypeClause}
+               ${blockDateClause}
           ),
           allowed_chunks AS (
             SELECT ch.id AS chunk_id
@@ -355,7 +373,7 @@ export async function runSearch(
           GROUP BY knn.chunk_id
           ORDER BY knn.distance`,
       )
-      .all(...channels, ...blockTypes, vector, baseChunkK) as ChunkHitRow[];
+      .all(...channels, ...blockFilterParams, vector, baseChunkK) as ChunkHitRow[];
   } else {
     // Path B — fallback. Run the unfiltered KNN with inflated k, gather
     // allowed block ids in JS, and drop everything else. Correct for any
@@ -375,11 +393,12 @@ export async function runSearch(
         .prepare(
           `SELECT DISTINCT bc.block_id
              FROM block_channels bc
-             ${typeFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
+             ${blockFiltered ? "JOIN blocks b ON b.id = bc.block_id" : ""}
             WHERE bc.channel_id IN (${inList})
-              ${typeFiltered ? `AND b.block_type IN (${typeInList})` : ""}`,
+              ${blockTypeClause}
+              ${blockDateClause}`,
         )
-        .all(...channels, ...blockTypes) as Array<{ block_id: number }>).map(
+        .all(...channels, ...blockFilterParams) as Array<{ block_id: number }>).map(
         (r) => r.block_id,
       ),
     );
