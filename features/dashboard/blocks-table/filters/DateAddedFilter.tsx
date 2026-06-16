@@ -14,7 +14,7 @@ type DateAddedFilterProps = {
 };
 
 type DatePresetOption = {
-  preset: DateAddedFilterPreset;
+  preset: Exclude<DateAddedFilterPreset, "custom">;
   label: string;
 };
 
@@ -23,20 +23,19 @@ const DATE_PRESET_OPTIONS: readonly DatePresetOption[] = [
   { preset: "past_week", label: "Past week" },
   { preset: "past_month", label: "Past month" },
   { preset: "past_year", label: "Past year" },
-  { preset: "custom", label: "Custom date range" },
 ];
 
 export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
-  function selectPreset(preset: DateAddedFilterPreset) {
-    if (preset === "custom") {
-      onChange({
-        preset,
-        from: value.preset === "custom" ? value.from ?? null : null,
-        to: value.preset === "custom" ? value.to ?? null : null,
-      });
-      return;
-    }
+  function selectPreset(preset: DatePresetOption["preset"]) {
     onChange({ preset });
+  }
+
+  function activateCustomRange() {
+    onChange({
+      preset: "custom",
+      from: value.preset === "custom" ? value.from ?? null : null,
+      to: value.preset === "custom" ? value.to ?? null : null,
+    });
   }
 
   function changeCustomRange(next: { from?: string | null; to?: string | null }) {
@@ -47,21 +46,25 @@ export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
     });
   }
 
+  const customSelected = value.preset === "custom";
+
   return (
     <FilterDisclosure title="Date added" controlsId="date-added-filter-options">
       {DATE_PRESET_OPTIONS.map((option) => (
-        <div key={option.preset} className="flex flex-col gap-2">
-          <FilterOptionButton
-            selected={value.preset === option.preset}
-            onClick={() => selectPreset(option.preset)}
-          >
-            {option.label}
-          </FilterOptionButton>
-          {option.preset === "custom" && value.preset === "custom" ? (
-            <DateRangePicker value={value} onChange={changeCustomRange} />
-          ) : null}
-        </div>
+        <FilterOptionButton
+          key={option.preset}
+          selected={value.preset === option.preset}
+          onClick={() => selectPreset(option.preset)}
+        >
+          {option.label}
+        </FilterOptionButton>
       ))}
+      <DateRangePicker
+        selected={customSelected}
+        value={customSelected ? value : {}}
+        onActivate={activateCustomRange}
+        onChange={changeCustomRange}
+      />
     </FilterDisclosure>
   );
 }

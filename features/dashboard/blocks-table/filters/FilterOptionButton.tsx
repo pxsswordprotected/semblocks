@@ -1,4 +1,9 @@
-import { type CSSProperties, type ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/utils";
 
 const SELECTED_FILTER_ROW_STYLE = {
@@ -11,29 +16,32 @@ const SELECTED_FILTER_ROW_STYLE = {
   ].join(", "),
 } satisfies CSSProperties;
 
-type FilterOptionButtonProps = {
+type FilterOptionButtonProps = Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "type"
+> & {
   selected: boolean;
-  onClick: () => void;
   children: ReactNode;
-  className?: string;
 };
 
-export function FilterOptionButton({
-  selected,
-  onClick,
-  children,
-  className,
-}: FilterOptionButtonProps) {
+export const FilterOptionButton = forwardRef<
+  HTMLButtonElement,
+  FilterOptionButtonProps
+>(function FilterOptionButton(
+  { selected, children, className, ...rest },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-pressed={selected}
-      onClick={onClick}
       className={cn(
         "group relative flex w-full items-center rounded-base px-2 py-1 text-left text-sm leading-5 transition-colors",
         selected ? "text-white" : "text-neutral-800",
         className,
       )}
+      {...rest}
     >
       {selected ? (
         <span
@@ -50,4 +58,4 @@ export function FilterOptionButton({
       <span className="relative z-10 min-w-0 truncate">{children}</span>
     </button>
   );
-}
+});

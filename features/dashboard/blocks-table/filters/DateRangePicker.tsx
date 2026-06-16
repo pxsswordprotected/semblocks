@@ -6,17 +6,15 @@ import {
   FloatingPortal,
   offset,
   shift,
-  useClick,
   useDismiss,
   useFloating,
   useInteractions,
   useRole,
 } from "@floating-ui/react";
 import { useState } from "react";
-import { CalendarBlank } from "@phosphor-icons/react/dist/ssr";
 import { DayPicker, type DateRange } from "react-day-picker";
-import Button from "@/components/Button";
 import { cn } from "@/lib/utils";
+import { FilterOptionButton } from "./FilterOptionButton";
 
 type DateRangeValue = {
   from?: string | null;
@@ -24,7 +22,9 @@ type DateRangeValue = {
 };
 
 type DateRangePickerProps = {
+  selected: boolean;
   value: DateRangeValue;
+  onActivate: () => void;
   onChange: (next: DateRangeValue) => void;
 };
 
@@ -42,15 +42,21 @@ function dateOnlyFromDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function formatRange(value: DateRangeValue): string {
+function formatRangeLabel(selected: boolean, value: DateRangeValue): string {
+  if (!selected) return "Custom date range";
   if (value.from && value.to) return `${value.from} → ${value.to}`;
   if (value.from) return `${value.from} → …`;
-  return "Pick date range";
+  return "Custom date range";
 }
 
-export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
+export function DateRangePicker({
+  selected: optionSelected,
+  value,
+  onActivate,
+  onChange,
+}: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
-  const selected: DateRange = {
+  const selectedRange: DateRange = {
     from: dateFromDateOnly(value.from),
     to: dateFromDateOnly(value.to),
   };
@@ -63,14 +69,21 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
     middleware: [offset(8), flip(), shift({ padding: 8 })],
     strategy: "fixed",
   });
-  const click = useClick(context);
   const dismiss = useDismiss(context, { escapeKey: true, outsidePress: true });
   const role = useRole(context, { role: "dialog" });
   const { getReferenceProps, getFloatingProps } = useInteractions([
-    click,
     dismiss,
     role,
   ]);
+
+  function togglePicker() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    onActivate();
+    setOpen(true);
+  }
 
   function selectRange(next: DateRange | undefined) {
     onChange({
@@ -81,16 +94,14 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
 
   return (
     <>
-      <Button
+      <FilterOptionButton
         ref={refs.setReference}
-        type="button"
-        variant="muted"
-        className="h-8 w-full justify-start gap-2 px-2 py-0 text-left font-normal"
-        {...getReferenceProps()}
+        selected={optionSelected}
+        aria-expanded={open}
+        {...getReferenceProps({ onClick: togglePicker })}
       >
-        <CalendarBlank size={16} weight="bold" aria-hidden="true" />
-        <span className="truncate">{formatRange(value)}</span>
-      </Button>
+        {formatRangeLabel(optionSelected, value)}
+      </FilterOptionButton>
       {open ? (
         <FloatingPortal>
           <div
@@ -105,7 +116,7 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
           >
             <DayPicker
               mode="range"
-              selected={selected}
+              selected={selectedRange}
               onSelect={selectRange}
               numberOfMonths={1}
               classNames={{
