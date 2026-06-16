@@ -110,11 +110,12 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
               numberOfMonths={1}
               classNames={{
                 root: "text-sm",
+                months: "relative",
                 month: "space-y-3",
                 month_caption: "flex h-7 items-center justify-center font-bold",
-                nav: "flex items-center justify-between",
-                button_previous: "absolute h-7 w-7 rounded-base hover:bg-black/5",
-                button_next: "absolute right-3 h-7 w-7 rounded-base hover:bg-black/5",
+                nav: "absolute inset-x-0 top-0 z-10 flex h-7 items-center justify-between",
+                button_previous: "flex h-7 w-7 items-center justify-center rounded-base hover:bg-black/5",
+                button_next: "flex h-7 w-7 items-center justify-center rounded-base hover:bg-black/5",
                 weekdays: "grid grid-cols-7 text-xs text-black/50",
                 weekday: "flex h-7 items-center justify-center font-normal",
                 week: "grid grid-cols-7",
