@@ -13,7 +13,7 @@ import {
   useRole,
   useTransitionStatus,
 } from "@floating-ui/react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Funnel } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
@@ -34,7 +34,29 @@ type FilterMenuButtonProps = {
   ownerMode?: boolean;
 };
 
-export function FilterMenuButton({ ownerMode = false }: FilterMenuButtonProps) {
+export function FilterMenuButton(props: FilterMenuButtonProps) {
+  return (
+    <Suspense fallback={<FilterMenuButtonFallback />}>
+      <FilterMenuButtonInner {...props} />
+    </Suspense>
+  );
+}
+
+function FilterMenuButtonFallback() {
+  return (
+    <Button
+      type="button"
+      aria-label="Filter blocks"
+      aria-expanded={false}
+      disabled
+      className="absolute top-1/2 right-6 flex h-9 w-9 -translate-y-1/2 items-center justify-center px-0 py-0"
+    >
+      <Funnel size={22} weight="bold" />
+    </Button>
+  );
+}
+
+function FilterMenuButtonInner({ ownerMode = false }: FilterMenuButtonProps) {
   const router = useRouter();
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
