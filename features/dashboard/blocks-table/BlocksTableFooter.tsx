@@ -1,16 +1,24 @@
 "use client";
 
-import { useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type KeyboardEvent,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
 import type { SearchHitsState } from "./useSearchHits";
+import { clampResultLimit, DEFAULT_RESULT_LIMIT } from "./resultLimit";
 
 type FooterProps = {
   status: SearchHitsState["status"];
   page: number;
   pageSize: number;
   totalCount: number;
+  resultLimit: number;
 };
 
 // Reserved-height row; mirrors the header (`h-5 px-6`) so the footer
@@ -22,6 +30,7 @@ export function BlocksTableFooter({
   page,
   pageSize,
   totalCount,
+  resultLimit,
 }: FooterProps) {
   // Footer renders content only when there's something to say. Idle /
   // loading / error keep the slot reserved (stable card height) but
@@ -44,10 +53,80 @@ export function BlocksTableFooter({
   return (
     <div className={FOOTER_SHELL}>
       <span className="text-sm whitespace-nowrap text-black/50">
-        Showing {start}–{end} of {totalCount}
+        Showing {start}–{end} of <EditableResultLimit value={resultLimit} />
       </span>
       <Pagination current={safePage} total={totalPages} />
     </div>
+  );
+}
+
+function EditableResultLimit({ value }: { value: number }) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [, startTransition] = useTransition();
+  const [draft, setDraft] = useState(String(value));
+  const skipNextBlurCommit = useRef(false);
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit() {
+    const nextValue = clampResultLimit(Number(draft));
+    if (nextValue === value) {
+      setDraft(String(value));
+      return;
+    }
+
+    setDraft(String(nextValue));
+    const next = new URLSearchParams(params);
+    if (nextValue === DEFAULT_RESULT_LIMIT) {
+      next.delete("k");
+    } else {
+      next.set("k", String(nextValue));
+    }
+    next.delete("page");
+
+    const qs = next.toString();
+    startTransition(() => {
+      router.replace(qs ? `?${qs}` : "?", { scroll: false });
+    });
+  }
+
+  function handleBlur() {
+    if (skipNextBlurCommit.current) {
+      skipNextBlurCommit.current = false;
+      return;
+    }
+    commit();
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commit();
+      skipNextBlurCommit.current = true;
+      event.currentTarget.blur();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      skipNextBlurCommit.current = true;
+      setDraft(String(value));
+      event.currentTarget.blur();
+    }
+  }
+
+  return (
+    <input
+      aria-label="Search result count"
+      className="inline-block w-[3ch] border-b border-black/40 bg-transparent text-center tabular-nums text-black/70 outline-none focus:border-black"
+      inputMode="numeric"
+      value={draft}
+      onBlur={handleBlur}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={handleKeyDown}
+    />
   );
 }
 

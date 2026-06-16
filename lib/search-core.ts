@@ -3,6 +3,7 @@
 import { getDb } from "./db.ts";
 import { embed } from "./embeddings.ts";
 import { EMPTY_SEARCH_FILTER_OPTIONS, resolveDateAddedRange } from "./search-filters.ts";
+import { clampSearchLimit, MAX_SEARCH_LIMIT } from "./search-limits.ts";
 import type { SearchFilterOptions } from "./search-filters.ts";
 
 export type Hit = {
@@ -132,10 +133,10 @@ function chooseBetter(existing: Hit | undefined, candidate: Hit): Hit {
   return candidate.distance < existing.distance ? candidate : existing;
 }
 
-export const MAX_SEARCH_LIMIT = 500;
+export { MAX_SEARCH_LIMIT };
 
 export function parseLimit(raw: string | null): number {
-  return Math.min(Math.max(Number(raw ?? 10), 1), MAX_SEARCH_LIMIT);
+  return clampSearchLimit(Number(raw ?? 10));
 }
 
 // Channel-filter parser used by both GET (CSV in querystring) and POST

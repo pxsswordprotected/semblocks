@@ -6,6 +6,7 @@ import type { Hit } from "@/lib/search-core";
 import {
   DEFAULT_RESULT_LIMIT,
   VISIBLE_ROWS_PER_PAGE,
+  clampResultLimit,
 } from "./resultLimit";
 import {
   appendSearchFiltersToParams,
@@ -196,9 +197,7 @@ export function useSearchHits(
   const channels = (params.get("channels") ?? "").trim();
   const page = parsePositiveInt(params.get("page"), 1);
   const pageSize = VISIBLE_ROWS_PER_PAGE;
-  const safeResultLimit = Number.isFinite(resultLimit)
-    ? Math.max(1, Math.floor(resultLimit))
-    : DEFAULT_RESULT_LIMIT;
+  const safeResultLimit = clampResultLimit(resultLimit);
 
   // Source precedence: demo (public snapshot) → img (owner ephemeral) →
   // live (owner q/sid). Live is locked for non-owners.

@@ -60,6 +60,8 @@ export function DateRangePicker({
     from: dateFromDateOnly(value.from),
     to: dateFromDateOnly(value.to),
   };
+  const today = new Date();
+  const todayDateOnly = dateOnlyFromDate(today);
 
   const { refs, floatingStyles, context } = useFloating({
     open,
@@ -86,10 +88,11 @@ export function DateRangePicker({
   }
 
   function selectRange(next: DateRange | undefined) {
-    onChange({
-      from: next?.from ? dateOnlyFromDate(next.from) : null,
-      to: next?.to ? dateOnlyFromDate(next.to) : null,
-    });
+    const from = next?.from ? dateOnlyFromDate(next.from) : null;
+    const to = next?.to ? dateOnlyFromDate(next.to) : null;
+    if ((from && from > todayDateOnly) || (to && to > todayDateOnly)) return;
+
+    onChange({ from, to });
   }
 
   return (
@@ -118,6 +121,9 @@ export function DateRangePicker({
               mode="range"
               selected={selectedRange}
               onSelect={selectRange}
+              disabled={{ after: today }}
+              endMonth={today}
+              excludeDisabled
               numberOfMonths={1}
               classNames={{
                 root: "text-sm",
