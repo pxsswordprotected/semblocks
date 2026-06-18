@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ArrowsClockwise } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "@/components/dashboard/panel";
-import { PROFILE_USERNAME } from "@/features/dashboard/profile/profile";
+import type { DashboardProfileConfig } from "@/lib/profile-config";
 import type { FullSyncResult } from "@/lib/full-sync";
 import type { JobEventRow, JobRow } from "@/lib/job-types";
 
@@ -22,13 +22,16 @@ type SyncStatus =
 export function SyncCard({
   className,
   ownerMode = false,
+  profileConfig,
 }: {
   className?: string;
   ownerMode?: boolean;
+  profileConfig: DashboardProfileConfig | null;
 }) {
   const [status, setStatus] = useState<SyncStatus>({ state: "idle" });
   const running = status.state === "running";
-  const disabled = !ownerMode || running;
+  const syncProfileTarget = profileConfig?.sync_profile ?? null;
+  const disabled = !ownerMode || running || !syncProfileTarget;
 
   useEffect(() => {
     if (status.state !== "running" || !status.jobId) return;
@@ -78,12 +81,12 @@ export function SyncCard({
   }, [status]);
 
   async function syncProfile() {
-    if (disabled) return;
+    if (disabled || !syncProfileTarget) return;
     setStatus({ state: "running", jobId: "", job: null });
 
     try {
       const res = await fetch(
-        `/api/jobs/sync?user=${encodeURIComponent(PROFILE_USERNAME)}`,
+        `/api/jobs/sync?user=${encodeURIComponent(syncProfileTarget.username)}`,
         { method: "POST" },
       );
       const body = (await res.json()) as { job_id?: string; error?: string };
@@ -112,9 +115,13 @@ export function SyncCard({
           {running ? "Syncing…" : "Sync new blocks"}
         </span>
         <span className="block max-w-full truncate text-sm text-black/50">
-          {ownerMode
-            ? `Current profile: ${PROFILE_USERNAME}`
-            : "Sync available in owner mode"}
+          {profileConfig === null
+            ? "Loading profile…"
+            : !syncProfileTarget
+              ? "Set ARENA_PROFILE_SLUG"
+              : ownerMode
+                ? `Current profile: ${syncProfileTarget.username}`
+                : "Sync available in owner mode"}
         </span>
         <SyncSummary status={status} />
       </button>

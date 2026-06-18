@@ -1,10 +1,16 @@
 import { User } from "@phosphor-icons/react/dist/ssr";
 import { Panel } from "@/components/dashboard/panel";
 import { cn } from "@/lib/utils";
-import { PROFILE_URL, PROFILE_USERNAME } from "@/features/dashboard/profile/profile";
+import type { DashboardProfileConfig } from "@/lib/profile-config";
 
-
-export function ProfileCard({ className }: { className?: string }) {
+export function ProfileCard({
+  className,
+  profileConfig,
+}: {
+  className?: string;
+  profileConfig: DashboardProfileConfig | null;
+}) {
+  const profile = profileConfig?.display_profile ?? null;
   return (
     <Panel
       className={cn(
@@ -15,18 +21,32 @@ export function ProfileCard({ className }: { className?: string }) {
       <div className="flex min-w-0 max-w-full items-center gap-1.5 text-[16px]">
         <User size={28} className="shrink-0" />
         <span className="min-w-0 truncate select-none">
-          Connected profile:{" "}
-          <span className="text-neutral-800">{PROFILE_USERNAME}</span>
+          {profile ? (
+            <>
+              Connected profile:{" "}
+              <span className="text-neutral-800">{profile.username}</span>
+            </>
+          ) : profileConfig === null ? (
+            "Loading profile…"
+          ) : (
+            <span className="text-neutral-800">No profile configured</span>
+          )}
         </span>
       </div>
-      <a
-        href={PROFILE_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-1 block max-w-full truncate text-sm underline text-link-external"
-      >
-        {PROFILE_URL}
-      </a>
+      {profile ? (
+        <a
+          href={profile.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 block max-w-full truncate text-sm underline text-link-external"
+        >
+          {profile.url}
+        </a>
+      ) : (
+        <span className="mt-1 block max-w-full truncate text-sm text-black/50">
+          Set ARENA_PROFILE_SLUG
+        </span>
+      )}
     </Panel>
   );
 }

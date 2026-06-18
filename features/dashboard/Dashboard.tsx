@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BlocksTableCard } from "@/features/dashboard/blocks-table/BlocksTableCard";
 import { BrandCard } from "@/features/dashboard/brand/BrandCard";
 import { ChannelsCard } from "@/features/dashboard/channels/ChannelsCard";
@@ -19,11 +19,33 @@ import { RecQueryInputCard } from "@/features/dashboard/rec-query-input/RecQuery
 import type { RecommendationState } from "@/features/dashboard/recommendations/types";
 import { SearchCard } from "@/features/dashboard/search/SearchCard";
 import { SyncCard } from "@/features/dashboard/sync/SyncCard";
+import type { DashboardProfileConfig } from "@/lib/profile-config";
 
 export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
   const [selectedChannels, setSelectedChannels] = useState<ChannelSummary[]>(
     [],
   );
+  const [profileConfig, setProfileConfig] =
+    useState<DashboardProfileConfig | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/profile");
+        const body = (await res.json()) as DashboardProfileConfig | { error: string };
+        if (!cancelled && res.ok && !("error" in body)) {
+          setProfileConfig(body);
+        }
+      } catch {
+        if (!cancelled) setProfileConfig(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
 
   const [recommendation, setRecommendation] = useState<RecommendationState>({
     status: "idle",
@@ -40,8 +62,15 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
       <div className={`flex shrink-0 flex-row ${DASHBOARD_GAP}`}>
         <BrandCard className={`${SIDEBAR_W} ${DASHBOARD_TOP_H} shrink-0`} />
         <div className={`flex min-w-0 flex-1 flex-row ${DASHBOARD_TOP_CARD_GAP}`}>
-          <ProfileCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} />
-          <SyncCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`} ownerMode={ownerMode} />
+          <ProfileCard
+            className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`}
+            profileConfig={profileConfig}
+          />
+          <SyncCard
+            className={`${DASHBOARD_TOP_H} min-w-0 flex-[1]`}
+            ownerMode={ownerMode}
+            profileConfig={profileConfig}
+          />
           <SearchCard className={`${DASHBOARD_TOP_H} min-w-0 flex-[2.3]`} ownerMode={ownerMode} />
         </div>
       </div>
