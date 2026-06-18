@@ -1,10 +1,8 @@
 # Semblocks
 
-[Write the short human intro here: what this is, why you made it, and what kind of research/archive workflow it is for.]
+Semblocks is way to index and efficiently uncover blocks from Are.na profiles. The purpose of this tool is to allow users to find blocks and channels related to your queries through either text or image. Semblocks speeds up search of large information bases that many Are.na users have, increasing succesful rates of finding information you need.
 
 ## What it does
-
-Semblocks is a local-first semantic search dashboard for an Are.na profile.
 
 It can:
 
@@ -19,7 +17,7 @@ It can:
 
 ## Personal note
 
-[Write this part yourself if you want the README to sound like you. Good place for: why the project exists, what you learned, what is intentionally rough, and what you might revisit later.]
+I made this tool since I archive many of things on my Are.na profile and I needed a way to quickly search through everyhting I have saved. Are.na's own search tool is limited in capacity, allowing for only direct indexxing capabilities. Semblocks makes searching much more efficent; I can now pull relevant blocks with an image upload for example. IN the future I want to add more capabilities like adding LLM search features for more dynamic interactions with information bases. 
 
 ## Stack
 
@@ -110,7 +108,7 @@ SQLITE_PATH=/absolute/or/relative/path/to/your.db
 
 ## Forking this for your own archive
 
-This repo no longer hardcodes the original Are.na profile in the dashboard. To use it with your own data:
+To use it with your own data:
 
 1. Set `ARENA_PROFILE_SLUG` in `.env.local`.
 2. Use your own `OPENAI_API_KEY`, `JINA_API_KEY`, and optional `ARENA_TOKEN`.
@@ -174,11 +172,3 @@ Important routes:
 - `POST /api/search` — owner-only image search
 - `GET /api/channels` — indexed channel list
 - `GET /api/dev/status` — index/dev status summary
-
-## Deployment notes
-
-[Add your own notes here if you deploy this anywhere: platform, env vars, database persistence, admin access, and whether public mode is intended to be used.]
-
-## Current limitations
-
-[Write this in your own voice. Suggested bullets to fill in: what is experimental, what is tuned to your archive, what needs cleanup, and what you would not trust yet.]
