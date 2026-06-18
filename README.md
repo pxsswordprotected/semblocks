@@ -135,18 +135,6 @@ The UI displays the configured profile when `ARENA_PROFILE_SLUG` is set. If it i
 - does not run live OpenAI search for visitors
 - can show public/demo behavior backed by stored demo searches
 
-## Useful commands
-
-```bash
-npm run dev        # start local dev server
-npm run build      # production build
-npm run start      # start production server after build
-npm run typecheck  # TypeScript check
-npm test           # node:test suite
-npm run demos      # rebuild stored demo searches from evals/queries.jsonl
-npm run eval       # run search eval queries
-```
-
 ## Data pipeline
 
 The full sync job runs these stages:
