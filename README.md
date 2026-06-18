@@ -17,7 +17,7 @@ It can:
 
 ## Personal note
 
-I made this tool since I archive many of things on my Are.na profile and I needed a way to quickly search through everyhting I have saved. Are.na's own search tool is limited in capacity, allowing for only direct indexxing capabilities. Semblocks makes searching much more efficent; I can now pull relevant blocks with an image upload for example. IN the future I want to add more capabilities like adding LLM search features for more dynamic interactions with information bases. 
+I made this tool since I archive many of things on my Are.na profile and I needed a way to quickly search through everyhting I have saved. Are.na's own search tool is limited in capacity, allowing for only direct indexxing capabilities. Semblocks makes searching much more efficent; I can now pull relevant blocks with an image upload for example. In the future I want to add more capabilities like adding LLM search features for more dynamic interactions with information bases. 
 
 ## Stack
 
