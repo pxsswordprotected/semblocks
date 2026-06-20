@@ -8,6 +8,7 @@ import {
   parseUserSlug,
   type ArenaBlock,
 } from "@/lib/arena";
+import { requireAdminApi } from "@/lib/admin-api";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,9 @@ function compareBlocks(a: BlockOut, b: BlockOut): number {
 }
 
 export async function GET(req: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
+
   const url = new URL(req.url);
   const userParam = url.searchParams.get("user");
   if (!userParam) {

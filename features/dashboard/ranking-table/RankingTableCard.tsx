@@ -1,5 +1,6 @@
 "use client";
 
+import { safeExternalHref } from "@/lib/safe-url";
 import { useEffect, useMemo, useState } from "react";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
@@ -166,6 +167,7 @@ function RecommendationRow({
 }) {
   const title = formatChannelTitle(channel.channel_title);
   const evidence = formatEvidenceText(channel);
+  const channelHref = safeExternalHref(channel.channel_url);
 
   return (
     <div
@@ -174,9 +176,9 @@ function RecommendationRow({
     >
       <div className="tabular-nums text-black/50">{rank}</div>
       <div className="min-w-0 overflow-hidden whitespace-nowrap text-ellipsis font-bold">
-        {channel.channel_url ? (
+        {channelHref ? (
           <a
-            href={channel.channel_url}
+            href={channelHref}
             target="_blank"
             rel="noopener noreferrer"
             title={title}

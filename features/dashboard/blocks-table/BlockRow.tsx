@@ -1,5 +1,6 @@
 "use client";
 
+import { safeExternalHref } from "@/lib/safe-url";
 import type { Hit } from "@/lib/search-core";
 import { BLOCK_GRID_CLASS, BLOCK_GRID_COLUMNS } from "./columns";
 import {
@@ -83,12 +84,13 @@ function LinkOrPlaceholder({
   href: string | null;
   label: string;
 }) {
-  if (!href) {
+  const safeHref = safeExternalHref(href);
+  if (!safeHref) {
     return <span className="text-black/30">{label}</span>;
   }
   return (
     <a
-      href={href}
+      href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
       className="text-link-external hover:underline"

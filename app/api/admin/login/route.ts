@@ -6,6 +6,12 @@ import {
   getConfiguredAdminAuth,
 } from "@/lib/admin-auth";
 import { isAdminAuthConfigured, verifyAdminPassword } from "@/lib/admin-auth-core";
+import {
+  adminLoginRateLimitKey,
+  checkAdminLoginRateLimit,
+  clearFailedAdminLogins,
+  recordFailedAdminLogin,
+} from "@/lib/admin-login-rate-limit";
 import { sameOriginPathUrl } from "@/lib/request-url";
 
 export const runtime = "nodejs";
@@ -19,14 +25,30 @@ export async function POST(req: Request) {
     return authFailure(req, wantsJson, "config", 500, "Admin auth is not configured");
   }
 
+  const rateLimitKey = adminLoginRateLimitKey(req);
+  const rateLimit = checkAdminLoginRateLimit(rateLimitKey);
+  if (rateLimit.limited) {
+    return authFailure(
+      req,
+      wantsJson,
+      "rate_limit",
+      429,
+      "Too many login attempts. Try again later.",
+      rateLimit.retryAfterSeconds,
+    );
+  }
+
   const parsed = await readPassword(req);
   if (!parsed.ok) {
     return authFailure(req, wantsJson, "missing", 400, parsed.error);
   }
 
   if (!verifyAdminPassword(parsed.password, config.password)) {
+    recordFailedAdminLogin(rateLimitKey);
     return authFailure(req, wantsJson, "invalid", 401, "Invalid password");
   }
+
+  clearFailedAdminLogins(rateLimitKey);
 
   const token = createCurrentAdminSessionToken();
   const res = wantsJson
@@ -78,11 +100,20 @@ function authFailure(
   code: string,
   status: number,
   message: string,
-) {
+  retryAfterSeconds?: number,
+): NextResponse {
   if (wantsJson) {
-    return NextResponse.json({ error: message }, { status });
+    const res = NextResponse.json({ error: message }, { status });
+    if (retryAfterSeconds !== undefined) {
+      res.headers.set("Retry-After", String(retryAfterSeconds));
+    }
+    return res;
   }
   const url = sameOriginPathUrl(req, "/dev");
   url.searchParams.set("error", code);
-  return NextResponse.redirect(url, { status: 303 });
+  const res = NextResponse.redirect(url, { status: 303 });
+  if (retryAfterSeconds !== undefined) {
+    res.headers.set("Retry-After", String(retryAfterSeconds));
+  }
+  return res;
 }

@@ -18,10 +18,17 @@ const WRITE_ENDPOINTS = [
   "/api/chunks",
   "/api/sync",
   "/api/search",
+  "/api/search-sessions",
   "/api/recommend-channel",
   "/api/jobs/ocr",
   "/api/jobs/sync",
   "/api/jobs/test-job-id/cancel",
+] as const;
+
+const ADMIN_READ_ENDPOINTS = [
+  "/api/arena?user=example-user",
+  "/api/jobs/test-job-id",
+  "/api/search-sessions/test-session-id",
 ] as const;
 
 test("admin write APIs reject unauthenticated and tampered cookies", { timeout: 120_000 }, async () => {
@@ -51,6 +58,18 @@ test("admin write APIs reject unauthenticated and tampered cookies", { timeout: 
 
       const tampered = await fetch(`${baseUrl}${endpoint}`, {
         method: "POST",
+        headers: { cookie: `${ADMIN_COOKIE_NAME}=tampered` },
+      });
+      assert.equal(tampered.status, 401, `${endpoint} should reject tampered admin cookie`);
+      assert.deepEqual(await tampered.json(), { error: "Admin required" });
+    }
+
+    for (const endpoint of ADMIN_READ_ENDPOINTS) {
+      const res = await fetch(`${baseUrl}${endpoint}`);
+      assert.equal(res.status, 401, `${endpoint} should reject missing admin cookie`);
+      assert.deepEqual(await res.json(), { error: "Admin required" });
+
+      const tampered = await fetch(`${baseUrl}${endpoint}`, {
         headers: { cookie: `${ADMIN_COOKIE_NAME}=tampered` },
       });
       assert.equal(tampered.status, 401, `${endpoint} should reject tampered admin cookie`);
