@@ -128,7 +128,7 @@ export function EvidenceBlocksHover({
     openingPointRef.current = null;
   }, [isMounted, open]);
 
-  const  ac = blocks.length;
+  const count = blocks.length;
   const blockNoun = count === 1 ? "block" : "blocks";
 
   return (
