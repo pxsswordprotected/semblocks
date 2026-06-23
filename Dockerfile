@@ -44,7 +44,7 @@ COPY --from=builder /app/components ./components
 COPY --from=builder /app/features ./features
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/data/schema.sql ./data/schema.sql
-COPY --from=builder /app/next.config.ts ./next.config.ts
+COPY --from=builder /app/next.config.mjs ./next.config.mjs
 
 EXPOSE 3000
 
