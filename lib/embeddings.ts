@@ -14,22 +14,30 @@ function client(): OpenAI {
 }
 
 export async function embed(input: string): Promise<Float32Array> {
-  const res = await withEmbeddingRetries(() =>
-    client().embeddings.create({
-      model: EMBEDDING_MODEL,
-      input,
-    }),
+  const res = await withEmbeddingRetries(
+    () =>
+      client().embeddings.create({
+        model: EMBEDDING_MODEL,
+        input,
+      }),
+    { onTransientError: resetClient },
   );
   return new Float32Array(res.data[0].embedding);
 }
 
 export async function embedMany(inputs: string[]): Promise<Float32Array[]> {
   if (inputs.length === 0) return [];
-  const res = await withEmbeddingRetries(() =>
-    client().embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: inputs,
-    }),
+  const res = await withEmbeddingRetries(
+    () =>
+      client().embeddings.create({
+        model: EMBEDDING_MODEL,
+        input: inputs,
+      }),
+    { onTransientError: resetClient },
   );
   return res.data.map((d) => new Float32Array(d.embedding));
+}
+
+function resetClient(): void {
+  _client = null;
 }

@@ -3,10 +3,15 @@ const BASE_DELAY_MS = 250;
 
 export async function withEmbeddingRetries<T>(
   operation: () => Promise<T>,
-  opts: { maxAttempts?: number; sleep?: (ms: number) => Promise<void> } = {},
+  opts: {
+    maxAttempts?: number;
+    sleep?: (ms: number) => Promise<void>;
+    onTransientError?: (err: unknown, attempt: number) => void;
+  } = {},
 ): Promise<T> {
   const maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const sleep = opts.sleep ?? defaultSleep;
+  const onTransientError = opts.onTransientError;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -15,6 +20,7 @@ export async function withEmbeddingRetries<T>(
     } catch (err) {
       lastError = err;
       if (attempt >= maxAttempts || !isTransientEmbeddingError(err)) break;
+      onTransientError?.(err, attempt);
       await sleep(BASE_DELAY_MS * attempt);
     }
   }
