@@ -1,15 +1,25 @@
 import OpenAI from "openai";
+import { Agent as HttpsAgent } from "node:https";
 import { withEmbeddingRetries } from "./embedding-retry.ts";
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 
 let _client: OpenAI | null = null;
+const OPENAI_HTTP_AGENT = new HttpsAgent({
+  keepAlive: false,
+  family: 4,
+});
+
 
 function client(): OpenAI {
   if (_client) return _client;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
-  _client = new OpenAI({ apiKey });
+  _client = new OpenAI({
+    apiKey,
+    httpAgent: OPENAI_HTTP_AGENT,
+    timeout: 30_000,
+  });
   return _client;
 }
 
