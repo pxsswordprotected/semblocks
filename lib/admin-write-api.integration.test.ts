@@ -29,6 +29,9 @@ const ADMIN_READ_ENDPOINTS = [
   "/api/arena?user=example-user",
   "/api/jobs/test-job-id",
   "/api/search-sessions/test-session-id",
+  "/api/export/all",
+  "/api/export/channels?ids=1",
+  "/api/export/search?q=test",
 ] as const;
 
 test("admin write APIs reject unauthenticated and tampered cookies", { timeout: 120_000 }, async () => {

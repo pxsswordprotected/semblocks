@@ -1,9 +1,11 @@
 "use client";
 
 import { CaretDown, CaretUp } from "@phosphor-icons/react/dist/ssr";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useSearchParams, type ReadonlyURLSearchParams } from "next/navigation";
 import Button from "@/components/Button";
 import { Panel } from "@/components/dashboard/panel";
+import type { ChannelSummary } from "@/features/dashboard/channels/types";
 import type { DevStatusLog, DevStatusResponse } from "@/lib/dev-status";
 import { cn } from "@/lib/utils";
 import type { JobEventRow, JobRow } from "@/lib/job-types";
@@ -17,9 +19,10 @@ type JobResponse = {
 type DeveloperPanelCardProps = {
   className?: string;
   ownerMode?: boolean;
+  selectedChannels?: ChannelSummary[];
 };
 
-type SectionId = "index" | "enrichment" | "actions" | "debug";
+type SectionId = "index" | "enrichment" | "export" | "actions" | "debug";
 
 type ActionId =
   | "pipeline"
@@ -42,6 +45,7 @@ type ApiError = {
 const SECTIONS: readonly { id: SectionId; title: string }[] = [
   { id: "index", title: "Index Status" },
   { id: "enrichment", title: "Enrichment" },
+  { id: "export", title: "Export" },
   { id: "actions", title: "Actions" },
   { id: "debug", title: "Debug" },
 ];
@@ -59,9 +63,10 @@ function isDevModeOnlySection(id: SectionId): boolean {
 export function DeveloperPanelCard({
   className,
   ownerMode = false,
+  selectedChannels = [],
 }: DeveloperPanelCardProps) {
   const [openSections, setOpenSections] = useState<Set<SectionId>>(
-    () => new Set(["index"]),
+    () => new Set(["index", "export"]),
   );
   const [status, setStatus] = useState<DevStatusResponse | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -263,6 +268,15 @@ export function DeveloperPanelCard({
             statusLoading={statusLoading}
             onRetry={() => void loadStatus()}
           />
+        );
+      case "export":
+        return (
+          <Suspense fallback={<ExportSectionFallback ownerMode={ownerMode} />}>
+            <ExportSection
+              ownerMode={ownerMode}
+              selectedChannels={selectedChannels}
+            />
+          </Suspense>
         );
       case "actions":
         return (
@@ -469,6 +483,116 @@ function EnrichmentSection({
   );
 }
 
+function ExportSectionFallback({ ownerMode }: { ownerMode: boolean }) {
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-xs leading-4 text-neutral-600">
+        {ownerMode
+          ? "Preparing export controls."
+          : "Log in at /dev to download JSON exports."}
+      </p>
+      <ActionButton disabled busy={false} label="Export all" onClick={() => {}} />
+      <ActionButton
+        disabled
+        busy={false}
+        label="Export selected channels"
+        onClick={() => {}}
+      />
+      <ActionButton
+        disabled
+        busy={false}
+        label="Export search results"
+        onClick={() => {}}
+      />
+    </div>
+  );
+}
+
+function ExportSection({
+  ownerMode,
+  selectedChannels,
+}: {
+  ownerMode: boolean;
+  selectedChannels: readonly ChannelSummary[];
+}) {
+  const searchParams = useSearchParams();
+  const selectedChannelIds = selectedChannels.map((channel) => channel.id);
+  const selectedChannelsHref = `/api/export/channels?ids=${selectedChannelIds.join(",")}`;
+  const searchHref = buildSearchExportHref(searchParams);
+  const hasSearchQuery = Boolean(
+    searchParams.get("q")?.trim() || searchParams.get("sid")?.trim(),
+  );
+
+  const disabledCopy = !ownerMode
+    ? "Log in at /dev to download JSON exports."
+    : null;
+
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-xs leading-4 text-neutral-600">
+        {disabledCopy ??
+          "Download lightweight JSON with block text, dates, URLs, and channels."}
+      </p>
+      <ActionButton
+        disabled={!ownerMode}
+        busy={false}
+        label="Export all"
+        onClick={() => startDownload("/api/export/all")}
+      />
+      <ActionButton
+        disabled={!ownerMode || selectedChannelIds.length === 0}
+        busy={false}
+        label={
+          selectedChannelIds.length === 0
+            ? "Export selected channels"
+            : `Export selected channels (${selectedChannelIds.length})`
+        }
+        onClick={() => startDownload(selectedChannelsHref)}
+      />
+      <ActionButton
+        disabled={!ownerMode || !hasSearchQuery}
+        busy={false}
+        label="Export search results"
+        onClick={() => startDownload(searchHref)}
+      />
+      {ownerMode && selectedChannelIds.length === 0 ? (
+        <p className="text-[11px] leading-4 text-neutral-500">
+          Select one or more channels to enable channel export.
+        </p>
+      ) : null}
+      {ownerMode && !hasSearchQuery ? (
+        <p className="text-[11px] leading-4 text-neutral-500">
+          Run a search to enable search-result export.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function buildSearchExportHref(searchParams: ReadonlyURLSearchParams): string {
+  const params = new URLSearchParams();
+  for (const key of [
+    "q",
+    "sid",
+    "k",
+    "channels",
+    "types",
+    "date",
+    "dateFrom",
+    "dateTo",
+  ]) {
+    for (const value of searchParams.getAll(key)) {
+      params.append(key, value);
+    }
+  }
+  const query = params.toString();
+  return query ? `/api/export/search?${query}` : "/api/export/search";
+}
+
+function startDownload(href: string) {
+  window.location.assign(href);
+}
+
 function ActionsSection({
   ownerMode,
   ingestUser,
@@ -614,7 +738,7 @@ function ActionButton({
   disabled: boolean;
   busy: boolean;
   label: string;
-  busyLabel: string;
+  busyLabel?: string;
   onClick: () => void;
 }) {
   return (
@@ -625,7 +749,7 @@ function ActionButton({
       onClick={onClick}
       className="w-full px-3 py-2 text-center"
     >
-      {busy ? busyLabel : label}
+      {busy ? busyLabel ?? label : label}
     </Button>
   );
 }

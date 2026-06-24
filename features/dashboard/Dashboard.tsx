@@ -83,7 +83,11 @@ export function Dashboard({ ownerMode = false }: { ownerMode?: boolean }) {
             className={`${DASHBOARD_PRIMARY_PANEL_H} shrink-0`}
             onSelectionChange={onChannelSelectionChange}
           />
-          <DeveloperPanelCard className="min-h-0 flex-1" ownerMode={ownerMode} />
+          <DeveloperPanelCard
+            className="min-h-0 flex-1"
+            ownerMode={ownerMode}
+            selectedChannels={selectedChannels}
+          />
         </div>
 
         {/* MAIN CONTENT */}
