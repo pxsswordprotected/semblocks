@@ -5,7 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BlockRow } from "./BlockRow";
 import { BlocksTableContentSkeleton } from "./BlocksTableContentSkeleton";
 import { BlocksTableFooter } from "./BlocksTableFooter";
-import { parseResultLimitParam, VISIBLE_ROWS_PER_PAGE } from "./resultLimit";
+import {
+  effectiveResultLimit,
+  parseResultLimitParam,
+  VISIBLE_ROWS_PER_PAGE,
+} from "./resultLimit";
 import {
   useSearchHits,
   type SearchHitsState,
@@ -29,7 +33,8 @@ export function BlocksTableContent({
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
-  const resultLimit = parseResultLimitParam(params.get("k"));
+  const requestedResultLimit = parseResultLimitParam(params.get("k"));
+  const resultLimit = effectiveResultLimit(requestedResultLimit, ownerMode);
   const state = useSearchHits(resultLimit, ownerMode);
 
   useEffect(() => {
@@ -57,6 +62,7 @@ export function BlocksTableContent({
         pageSize={state.pageSize}
         totalCount={state.totalCount}
         resultLimit={resultLimit}
+        ownerMode={ownerMode}
       />
     </>
   );

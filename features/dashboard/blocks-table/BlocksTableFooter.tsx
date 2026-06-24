@@ -19,6 +19,7 @@ type FooterProps = {
   pageSize: number;
   totalCount: number;
   resultLimit: number;
+  ownerMode: boolean;
 };
 
 // Reserved-height row; mirrors the header (`h-5 px-6`) so the footer
@@ -31,6 +32,7 @@ export function BlocksTableFooter({
   pageSize,
   totalCount,
   resultLimit,
+  ownerMode,
 }: FooterProps) {
   // Footer renders content only when there's something to say. Idle /
   // loading / error keep the slot reserved (stable card height) but
@@ -53,25 +55,66 @@ export function BlocksTableFooter({
   return (
     <div className={FOOTER_SHELL}>
       <span className="text-sm whitespace-nowrap text-black/50">
-        Showing {start}–{end} of <EditableResultLimit value={resultLimit} />
+        Showing {start}–{end} of{" "}
+        <EditableResultLimit value={resultLimit} ownerMode={ownerMode} />
       </span>
       <Pagination current={safePage} total={totalPages} />
     </div>
   );
 }
 
-function EditableResultLimit({ value }: { value: number }) {
+function EditableResultLimit({
+  value,
+  ownerMode,
+}: {
+  value: number;
+  ownerMode: boolean;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
   const [draft, setDraft] = useState(String(value));
+  const [showDevModeTip, setShowDevModeTip] = useState(false);
   const skipNextBlurCommit = useRef(false);
-
+  const devModeTipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     setDraft(String(value));
   }, [value]);
 
+  useEffect(() => {
+    return () => {
+      if (devModeTipTimer.current) clearTimeout(devModeTipTimer.current);
+    };
+  }, []);
+
+  function showBlockedEditTip() {
+    if (devModeTipTimer.current) clearTimeout(devModeTipTimer.current);
+    setShowDevModeTip(true);
+    devModeTipTimer.current = setTimeout(() => {
+      setShowDevModeTip(false);
+      devModeTipTimer.current = null;
+    }, 3000);
+  }
+
   function commit() {
+    if (!ownerMode) {
+      const attemptedChange = draft.trim() !== String(value);
+      const next = new URLSearchParams(params);
+      const hadBlockedParams = next.has("k") || next.has("page");
+
+      setDraft(String(value));
+      if (hadBlockedParams) {
+        next.delete("k");
+        next.delete("page");
+        const qs = next.toString();
+        startTransition(() => {
+          router.replace(qs ? `?${qs}` : "?", { scroll: false });
+        });
+      }
+      if (attemptedChange || hadBlockedParams) showBlockedEditTip();
+      return;
+    }
+
     const nextValue = clampResultLimit(Number(draft));
     if (nextValue === value) {
       setDraft(String(value));
@@ -118,15 +161,25 @@ function EditableResultLimit({ value }: { value: number }) {
   }
 
   return (
-    <input
-      aria-label="Search result count"
-      className="inline-block w-[3ch] border-b border-black/40 bg-transparent text-center tabular-nums text-black/70 outline-none focus:border-black"
-      inputMode="numeric"
-      value={draft}
-      onBlur={handleBlur}
-      onChange={(event) => setDraft(event.target.value)}
-      onKeyDown={handleKeyDown}
-    />
+    <span className="relative inline-flex items-center">
+      <input
+        aria-label="Search result count"
+        className="inline-block w-[3ch] border-b border-black/40 bg-transparent text-center tabular-nums text-black/70 outline-none focus:border-black"
+        inputMode="numeric"
+        value={draft}
+        onBlur={handleBlur}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+      {showDevModeTip ? (
+        <span
+          role="status"
+          className="absolute top-1/2 left-full z-10 ml-2 w-64 -translate-y-1/2 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs whitespace-normal text-red-700 shadow-sm"
+        >
+          Changing the number of displayed blocks is only available in dev mode.
+        </span>
+      ) : null}
+    </span>
   );
 }
 

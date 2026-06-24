@@ -7,6 +7,7 @@ import {
   MIN_RESULT_LIMIT,
   VISIBLE_ROWS_PER_PAGE,
   clampResultLimit,
+  effectiveResultLimit,
   parseResultLimitParam,
 } from "./resultLimit.ts";
 
@@ -37,4 +38,9 @@ test("result limit parser floors fractional values and rejects invalid values", 
   assert.equal(parseResultLimitParam("12.9"), 12);
   assert.equal(parseResultLimitParam("abc"), DEFAULT_RESULT_LIMIT);
   assert.equal(clampResultLimit(Number.NaN), DEFAULT_RESULT_LIMIT);
+});
+
+test("effective result limit honors URL values only in owner mode", () => {
+  assert.equal(effectiveResultLimit(24, true), 24);
+  assert.equal(effectiveResultLimit(24, false), DEFAULT_RESULT_LIMIT);
 });
