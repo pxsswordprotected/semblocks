@@ -11,6 +11,7 @@ import { DateRangePicker } from "./DateRangePicker";
 type DateAddedFilterProps = {
   value: DateAddedFilterValue;
   onChange: (next: DateAddedFilterValue) => void;
+  readOnly?: boolean;
 };
 
 type DatePresetOption = {
@@ -25,12 +26,18 @@ const DATE_PRESET_OPTIONS: readonly DatePresetOption[] = [
   { preset: "past_year", label: "Past year" },
 ];
 
-export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
+export function DateAddedFilter({
+  value,
+  onChange,
+  readOnly = false,
+}: DateAddedFilterProps) {
   function selectPreset(preset: DatePresetOption["preset"]) {
+    if (readOnly) return;
     onChange({ preset });
   }
 
   function activateCustomRange() {
+    if (readOnly) return;
     onChange({
       preset: "custom",
       from: value.preset === "custom" ? value.from ?? null : null,
@@ -39,6 +46,7 @@ export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
   }
 
   function changeCustomRange(next: { from?: string | null; to?: string | null }) {
+    if (readOnly) return;
     onChange({
       preset: "custom",
       from: next.from ?? null,
@@ -55,6 +63,7 @@ export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
           key={option.preset}
           selected={value.preset === option.preset}
           onClick={() => selectPreset(option.preset)}
+          aria-disabled={readOnly}
         >
           {option.label}
         </FilterOptionButton>
@@ -64,6 +73,7 @@ export function DateAddedFilter({ value, onChange }: DateAddedFilterProps) {
         value={customSelected ? value : {}}
         onActivate={activateCustomRange}
         onChange={changeCustomRange}
+        readOnly={readOnly}
       />
     </FilterDisclosure>
   );

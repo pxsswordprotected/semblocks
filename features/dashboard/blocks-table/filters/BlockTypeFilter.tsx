@@ -11,10 +11,16 @@ import { FilterOptionButton } from "./FilterOptionButton";
 type BlockTypeFilterProps = {
   value: readonly BlockTypeFilterValue[];
   onChange: (next: readonly BlockTypeFilterValue[]) => void;
+  readOnly?: boolean;
 };
 
-export function BlockTypeFilter({ value, onChange }: BlockTypeFilterProps) {
+export function BlockTypeFilter({
+  value,
+  onChange,
+  readOnly = false,
+}: BlockTypeFilterProps) {
   function toggleType(blockType: BlockTypeFilterValue) {
+    if (readOnly) return;
     const next = toggleBlockTypeFilter({ blockTypes: value }, blockType);
     onChange(next.blockTypes);
   }
@@ -25,7 +31,8 @@ export function BlockTypeFilter({ value, onChange }: BlockTypeFilterProps) {
         <FilterOptionButton
           key={blockType}
           selected={value.includes(blockType)}
-          onClick={() => toggleType(blockType)}
+          aria-disabled={readOnly}
+          onClick={readOnly ? undefined : () => toggleType(blockType)}
         >
           {blockType}
         </FilterOptionButton>

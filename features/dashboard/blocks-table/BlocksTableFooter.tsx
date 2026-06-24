@@ -161,7 +161,7 @@ function EditableResultLimit({
   }
 
   return (
-    <span className="relative inline-flex items-center">
+    <>
       <input
         aria-label="Search result count"
         className="inline-block w-[3ch] border-b border-black/40 bg-transparent text-center tabular-nums text-black/70 outline-none focus:border-black"
@@ -172,14 +172,13 @@ function EditableResultLimit({
         onKeyDown={handleKeyDown}
       />
       {showDevModeTip ? (
-        <span
-          role="status"
-          className="absolute top-1/2 left-full z-10 ml-2 w-64 -translate-y-1/2 rounded border border-red-300 bg-red-50 px-2 py-1 text-xs whitespace-normal text-red-700 shadow-sm"
-        >
-          Changing the number of displayed blocks is only available in dev mode.
+        <span role="status" className="text-red-600">
+          {" "}
+          · Changing the number of displayed blocks is only available in dev
+          mode.
         </span>
       ) : null}
-    </span>
+    </>
   );
 }
 

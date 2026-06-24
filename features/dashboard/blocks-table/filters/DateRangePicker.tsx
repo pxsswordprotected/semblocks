@@ -26,6 +26,7 @@ type DateRangePickerProps = {
   value: DateRangeValue;
   onActivate: () => void;
   onChange: (next: DateRangeValue) => void;
+  readOnly?: boolean;
 };
 
 function dateFromDateOnly(value: string | null | undefined): Date | undefined {
@@ -54,6 +55,7 @@ export function DateRangePicker({
   value,
   onActivate,
   onChange,
+  readOnly = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const selectedRange: DateRange = {
@@ -79,6 +81,7 @@ export function DateRangePicker({
   ]);
 
   function togglePicker() {
+    if (readOnly) return;
     if (open) {
       setOpen(false);
       return;
@@ -100,8 +103,9 @@ export function DateRangePicker({
       <FilterOptionButton
         ref={refs.setReference}
         selected={optionSelected}
+        aria-disabled={readOnly}
         aria-expanded={open}
-        {...getReferenceProps({ onClick: togglePicker })}
+        {...getReferenceProps({ onClick: readOnly ? undefined : togglePicker })}
       >
         {formatRangeLabel(optionSelected, value)}
       </FilterOptionButton>

@@ -19,6 +19,7 @@ import { Funnel } from "@phosphor-icons/react/dist/ssr";
 import Button from "@/components/Button";
 import { cn } from "@/lib/utils";
 import {
+  EMPTY_SEARCH_FILTERS,
   parseSearchFilters,
   searchFiltersEqual,
   serializeSearchFilters,
@@ -62,7 +63,10 @@ function FilterMenuButtonInner({ ownerMode = false }: FilterMenuButtonProps) {
   const [open, setOpen] = useState(false);
   const committedFilters = useMemo(() => parseSearchFilters(params), [params]);
   const [draftFilters, setDraftFilters] = useState(committedFilters);
-  const applyDisabled = searchFiltersEqual(draftFilters, committedFilters);
+  const visibleFilters = ownerMode ? draftFilters : EMPTY_SEARCH_FILTERS;
+  const filterControlsReadOnly = !ownerMode;
+  const applyDisabled =
+    !ownerMode || searchFiltersEqual(draftFilters, committedFilters);
 
   useEffect(() => {
     if (open) setDraftFilters(committedFilters);
@@ -96,7 +100,7 @@ function FilterMenuButtonInner({ ownerMode = false }: FilterMenuButtonProps) {
   });
 
   function applyFilters() {
-    if (applyDisabled) return;
+    if (!ownerMode || applyDisabled) return;
     const nextParams = serializeSearchFilters(
       new URLSearchParams(params.toString()),
       draftFilters,
@@ -145,42 +149,40 @@ function FilterMenuButtonInner({ ownerMode = false }: FilterMenuButtonProps) {
               <div className="shrink-0 border-b border-black/10 px-3 py-2 font-[Arial] text-[16px] font-bold text-neutral-800">
                 Filters
               </div>
-              {ownerMode ? (
-                <div className="relative flex min-h-0 flex-1 flex-col px-3 py-3 pb-16">
-                  <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <BlockTypeFilter
-                      value={draftFilters.blockTypes}
-                      onChange={(blockTypes) =>
-                        setDraftFilters((current) => ({
-                          ...current,
-                          blockTypes,
-                        }))
-                      }
-                    />
-                    <DateAddedFilter
-                      value={draftFilters.dateAdded}
-                      onChange={(dateAdded) =>
-                        setDraftFilters((current) => ({
-                          ...current,
-                          dateAdded,
-                        }))
-                      }
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    disabled={applyDisabled}
-                    className="absolute right-3 bottom-3 left-3 h-9"
-                    onClick={applyFilters}
-                  >
-                    Apply filters
-                  </Button>
+              <div className="relative flex min-h-0 flex-1 flex-col px-3 py-3 pb-16">
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <BlockTypeFilter
+                    value={visibleFilters.blockTypes}
+                    readOnly={filterControlsReadOnly}
+                    onChange={(blockTypes) =>
+                      setDraftFilters((current) => ({
+                        ...current,
+                        blockTypes,
+                      }))
+                    }
+                  />
+                  <DateAddedFilter
+                    value={visibleFilters.dateAdded}
+                    readOnly={filterControlsReadOnly}
+                    onChange={(dateAdded) =>
+                      setDraftFilters((current) => ({
+                        ...current,
+                        dateAdded,
+                      }))
+                    }
+                  />
                 </div>
-              ) : (
-                <div className="flex min-h-0 flex-1 items-center justify-center px-4 py-3 text-center font-[Arial] text-base leading-5 text-black/50">
-                  You must be in dev mode to use filters.
-                </div>
-              )}
+                <Button
+                  type="button"
+                  disabled={applyDisabled}
+                  className="absolute right-3 bottom-3 left-3 h-9"
+                  onClick={applyFilters}
+                >
+                  {ownerMode
+                    ? "Apply filters"
+                    : "Filters only available in dev mode"}
+                </Button>
+              </div>
             </div>
           </div>
         </FloatingPortal>
