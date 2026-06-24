@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-api";
 import {
-  buildJsonExportForBlockIds,
+  buildMarkdownExportForBlockIds,
   getExportBlockIdsForChannels,
-  jsonExportResponse,
+  markdownExportResponse,
   parseExportChannelIds,
-} from "@/lib/json-export";
+} from "@/lib/markdown-export";
 
 export const runtime = "nodejs";
 
@@ -24,12 +24,12 @@ export async function GET(req: Request) {
 
   try {
     const blockIds = getExportBlockIdsForChannels(channelIds);
-    const payload = buildJsonExportForBlockIds({
+    const document = buildMarkdownExportForBlockIds({
       blockIds,
       scope: { type: "channels", channel_ids: channelIds },
     });
 
-    return jsonExportResponse(payload, "semblocks-export-channels");
+    return markdownExportResponse(document, "semblocks-export-channels");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

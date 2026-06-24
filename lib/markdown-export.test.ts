@@ -3,10 +3,12 @@ import { test } from "node:test";
 import Database from "better-sqlite3";
 
 import {
-  buildJsonExportForBlockIds,
+  buildMarkdownExportForBlockIds,
   getExportBlockIdsForChannels,
+  markdownExportResponse,
   parseExportChannelIds,
-} from "./json-export.ts";
+  renderMarkdownExport,
+} from "./markdown-export.ts";
 
 function makeDb(): Database.Database {
   const db = new Database(":memory:");
@@ -121,43 +123,33 @@ function seedDb(db: Database.Database) {
   ).run(1, "Transcript text");
 }
 
-test("buildJsonExportForBlockIds returns lightweight ordered content export", () => {
+test("buildMarkdownExportForBlockIds returns minimal ordered content export", () => {
   const db = makeDb();
   seedDb(db);
   const beforeBlocks = rowCount(db, "blocks");
   const beforeChannels = rowCount(db, "block_channels");
 
-  const payload = buildJsonExportForBlockIds({
+  const document = buildMarkdownExportForBlockIds({
     blockIds: [2, 1, 2, 999],
     scope: { type: "all" },
     db,
   });
 
-  assert.equal(payload.schema_version, 1);
-  assert.equal(payload.source, "semblocks");
-  assert.equal(payload.block_count, 2);
-  assert.deepEqual(payload.blocks.map((block) => block.id), [2, 1]);
+  assert.equal(document.block_count, 2);
+  assert.deepEqual(document.blocks.map((block) => block.id), [2, 1]);
 
-  const fallbackBlock = payload.blocks[0];
-  assert.equal(fallbackBlock.arena_id, 102);
-  assert.equal(fallbackBlock.content, "Only searchable fallback");
-  assert.deepEqual(fallbackBlock.content_sources, ["search_text"]);
+  const fallbackBlock = document.blocks[0];
+  assert.deepEqual(fallbackBlock, {
+    id: 2,
+    date: "2026-01-03T00:00:00.000Z",
+    arena_url: "https://www.are.na/block/102",
+    content: "Only searchable fallback",
+  });
 
-  const richBlock = payload.blocks[1];
-  assert.equal(richBlock.arena_id, 101);
-  assert.deepEqual(richBlock.channels, [
-    { id: 10, title: "Design", url: "https://www.are.na/user/design" },
-    { id: 11, title: "Research", url: "https://www.are.na/user/research" },
-  ]);
-  assert.deepEqual(richBlock.content_sources, [
-    "title",
-    "description",
-    "content_text",
-    "ocr_summary",
-    "ocr_text",
-    "link_content",
-    "transcript",
-  ]);
+  const richBlock = document.blocks[1];
+  assert.equal(richBlock.id, 1);
+  assert.equal(richBlock.date, "2026-01-01T00:00:00.000Z");
+  assert.equal(richBlock.arena_url, "https://www.are.na/block/101");
   assert.equal(
     richBlock.content,
     [
@@ -170,12 +162,51 @@ test("buildJsonExportForBlockIds returns lightweight ordered content export", ()
       "Transcript text",
     ].join("\n\n"),
   );
-  assert.equal(Object.hasOwn(richBlock, "search_text"), false);
+  assert.equal(Object.hasOwn(richBlock, "channels"), false);
+  assert.equal(Object.hasOwn(richBlock, "type"), false);
+  assert.equal(Object.hasOwn(richBlock, "source_url"), false);
   assert.equal(Object.hasOwn(richBlock, "embedding"), false);
   assert.equal(Object.hasOwn(richBlock, "distance"), false);
 
   assert.equal(rowCount(db, "blocks"), beforeBlocks);
   assert.equal(rowCount(db, "block_channels"), beforeChannels);
+});
+
+test("renderMarkdownExport emits compact Markdown instead of JSON", () => {
+  const db = makeDb();
+  seedDb(db);
+
+  const document = buildMarkdownExportForBlockIds({
+    blockIds: [2],
+    scope: { type: "all" },
+    db,
+  });
+  const markdown = renderMarkdownExport(document);
+
+  assert.match(markdown, /^# Semblocks export\n/);
+  assert.match(markdown, /## 2\ndate: 2026-01-03T00:00:00.000Z\narena_url: https:\/\/www\.are\.na\/block\/102\n\nOnly searchable fallback\n$/);
+  assert.equal(markdown.includes('"blocks"'), false);
+  assert.equal(markdown.includes("channels"), false);
+  assert.equal(markdown.includes("block_type"), false);
+});
+
+test("markdownExportResponse downloads a Markdown file", async () => {
+  const response = markdownExportResponse(
+    {
+      exported_at: "2026-06-24T00:00:00.000Z",
+      scope: { type: "all" },
+      block_count: 0,
+      blocks: [],
+    },
+    "semblocks-export-all",
+  );
+
+  assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.match(
+    response.headers.get("content-disposition") ?? "",
+    /^attachment; filename="semblocks-export-all-\d{4}-\d{2}-\d{2}\.md"$/,
+  );
+  assert.match(await response.text(), /^# Semblocks export\n/);
 });
 
 test("getExportBlockIdsForChannels preserves recency order and dedupes inputs", () => {

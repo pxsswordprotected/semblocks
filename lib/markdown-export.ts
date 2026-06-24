@@ -2,7 +2,7 @@ import type Database from "better-sqlite3";
 import { getDb } from "./db.ts";
 import type { SearchFilterOptions } from "./search-filters.ts";
 
-export type JsonExportScope =
+export type MarkdownExportScope =
   | { type: "all" }
   | { type: "channels"; channel_ids: number[] }
   | {
@@ -13,34 +13,18 @@ export type JsonExportScope =
       channel_ids: number[] | null;
     };
 
-export type JsonExportChannel = {
+export type MarkdownExportBlock = {
   id: number;
-  title: string | null;
-  url: string | null;
-};
-
-export type JsonExportBlock = {
-  id: number;
-  arena_id: number;
-  title: string | null;
-  description: string | null;
-  type: string | null;
-  url: string | null;
+  date: string | null;
   arena_url: string | null;
-  channels: JsonExportChannel[];
-  created_at: string | null;
-  updated_at: string | null;
-  content_sources: string[];
   content: string;
 };
 
-export type JsonExportPayload = {
-  schema_version: 1;
-  source: "semblocks";
+export type MarkdownExportDocument = {
   exported_at: string;
-  scope: JsonExportScope;
+  scope: MarkdownExportScope;
   block_count: number;
-  blocks: JsonExportBlock[];
+  blocks: MarkdownExportBlock[];
 };
 
 type Db = Database.Database;
@@ -49,11 +33,8 @@ type IdRow = { id: number };
 
 type BlockRow = {
   id: number;
-  arena_block_id: number;
   title: string | null;
   description: string | null;
-  block_type: string | null;
-  source_url: string | null;
   search_text: string | null;
   content_text: string | null;
   arena_url: string | null;
@@ -65,15 +46,7 @@ type BlockRow = {
   transcript_text: string | null;
 };
 
-type ChannelRow = {
-  block_id: number;
-  id: number;
-  title: string | null;
-  url: string | null;
-};
-
 type ContentPart = {
-  source: string;
   text: string | null;
 };
 
@@ -129,15 +102,15 @@ export function parseExportChannelIds(raw: string | null): number[] | null {
   return unique.length > 0 ? unique : null;
 }
 
-export function buildJsonExportForBlockIds({
+export function buildMarkdownExportForBlockIds({
   blockIds,
   scope,
   db = getDb(),
 }: {
   blockIds: number[];
-  scope: JsonExportScope;
+  scope: MarkdownExportScope;
   db?: Db;
-}): JsonExportPayload {
+}): MarkdownExportDocument {
   const ids = uniquePositiveIntegers(blockIds);
 
   const blocks = db.transaction(() => {
@@ -147,11 +120,8 @@ export function buildJsonExportForBlockIds({
     const blockRows = db
       .prepare(
         `SELECT b.id,
-                b.arena_block_id,
                 b.title,
                 b.description,
-                b.block_type,
-                b.source_url,
                 b.search_text,
                 b.content_text,
                 b.arena_url,
@@ -169,35 +139,15 @@ export function buildJsonExportForBlockIds({
       )
       .all(...ids) as BlockRow[];
 
-    const channelRows = db
-      .prepare(
-        `SELECT bc.block_id, c.id, c.title, c.url
-           FROM block_channels bc
-           JOIN channels c ON c.id = bc.channel_id
-          WHERE bc.block_id IN (${placeholders})
-          ORDER BY bc.block_id, lower(c.title), c.id`,
-      )
-      .all(...ids) as ChannelRow[];
-
-    const channelsByBlock = new Map<number, JsonExportChannel[]>();
-    for (const row of channelRows) {
-      const channels = channelsByBlock.get(row.block_id);
-      const channel = { id: row.id, title: row.title, url: row.url };
-      if (channels) channels.push(channel);
-      else channelsByBlock.set(row.block_id, [channel]);
-    }
-
     const rowsById = new Map(blockRows.map((row) => [row.id, row]));
     return ids.flatMap((id) => {
       const row = rowsById.get(id);
       if (!row) return [];
-      return [toExportBlock(row, channelsByBlock.get(id) ?? [])];
+      return [toExportBlock(row)];
     });
   })();
 
   return {
-    schema_version: 1,
-    source: "semblocks",
     exported_at: new Date().toISOString(),
     scope,
     block_count: blocks.length,
@@ -205,57 +155,62 @@ export function buildJsonExportForBlockIds({
   };
 }
 
-export function jsonExportResponse(
-  payload: JsonExportPayload,
+export function markdownExportResponse(
+  document: MarkdownExportDocument,
   filenameStem: string,
 ): Response {
-  const filename = `${safeFilenameStem(filenameStem)}-${dateStamp()}.json`;
-  return new Response(JSON.stringify(payload, null, 2), {
+  const filename = `${safeFilenameStem(filenameStem)}-${dateStamp()}.md`;
+  return new Response(renderMarkdownExport(document), {
     status: 200,
     headers: {
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": "text/markdown; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },
   });
 }
 
-function toExportBlock(
-  row: BlockRow,
-  channels: JsonExportChannel[],
-): JsonExportBlock {
+export function renderMarkdownExport(document: MarkdownExportDocument): string {
+  const lines: string[] = [
+    "# Semblocks export",
+    "",
+    `exported_at: ${document.exported_at}`,
+    `block_count: ${document.block_count}`,
+    "",
+  ];
+
+  for (const block of document.blocks) {
+    lines.push(
+      `## ${block.id}`,
+      `date: ${block.date ?? ""}`,
+      `arena_url: ${block.arena_url ?? ""}`,
+      "",
+      block.content,
+      "",
+    );
+  }
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function toExportBlock(row: BlockRow): MarkdownExportBlock {
   const baseParts: ContentPart[] = [
-    { source: "title", text: row.title },
-    { source: "description", text: row.description },
-    { source: "content_text", text: row.content_text },
-    { source: "ocr_summary", text: row.ocr_summary },
-    { source: "ocr_text", text: row.ocr_text },
-    { source: "link_content", text: row.link_content_text },
-    { source: "transcript", text: row.transcript_text },
+    { text: row.title },
+    { text: row.description },
+    { text: row.content_text },
+    { text: row.ocr_summary },
+    { text: row.ocr_text },
+    { text: row.link_content_text },
+    { text: row.transcript_text },
   ];
 
   let content = contentFromParts(baseParts);
-  let contentSources = baseParts
-    .filter((part) => hasText(part.text))
-    .map((part) => part.source);
-
-  if (!content && hasText(row.search_text)) {
-    content = row.search_text!.trim();
-    contentSources = ["search_text"];
-  }
+  if (!content && hasText(row.search_text)) content = row.search_text!.trim();
 
   return {
     id: row.id,
-    arena_id: row.arena_block_id,
-    title: row.title,
-    description: row.description,
-    type: row.block_type,
-    url: row.source_url,
+    date: row.created_at ?? row.updated_at,
     arena_url: row.arena_url,
-    channels,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    content_sources: contentSources,
     content,
   };
 }

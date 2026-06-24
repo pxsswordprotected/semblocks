@@ -489,7 +489,7 @@ function ExportSectionFallback({ ownerMode }: { ownerMode: boolean }) {
       <p className="text-xs leading-4 text-neutral-600">
         {ownerMode
           ? "Preparing export controls."
-          : "Log in at /dev to download JSON exports."}
+          : "Log in at /dev to download Markdown exports."}
       </p>
       <ActionButton disabled busy={false} label="Export all" onClick={() => {}} />
       <ActionButton
@@ -524,14 +524,14 @@ function ExportSection({
   );
 
   const disabledCopy = !ownerMode
-    ? "Log in at /dev to download JSON exports."
+    ? "Log in at /dev to download Markdown exports."
     : null;
 
   return (
     <div className="flex flex-col gap-2 text-sm">
       <p className="text-xs leading-4 text-neutral-600">
         {disabledCopy ??
-          "Download lightweight JSON with block text, dates, URLs, and channels."}
+          "Download minimal Markdown with block id, date, Are.na URL, and content."}
       </p>
       <ActionButton
         disabled={!ownerMode}

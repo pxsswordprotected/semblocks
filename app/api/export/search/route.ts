@@ -15,9 +15,9 @@ import {
   resolveSearchQuery,
 } from "@/lib/search-sessions";
 import {
-  buildJsonExportForBlockIds,
-  jsonExportResponse,
-} from "@/lib/json-export";
+  buildMarkdownExportForBlockIds,
+  markdownExportResponse,
+} from "@/lib/markdown-export";
 
 export const runtime = "nodejs";
 
@@ -59,11 +59,11 @@ export async function GET(req: Request) {
 
   try {
     const hits = await runSearch(query, limit, channels, filters);
-    const payload = buildJsonExportForBlockIds({
+    const document = buildMarkdownExportForBlockIds({
       blockIds: hits.map((hit) => hit.block_id),
       scope: { type: "search", query, limit, filters, channel_ids: channels },
     });
-    return jsonExportResponse(payload, "semblocks-export-search");
+    return markdownExportResponse(document, "semblocks-export-search");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });
