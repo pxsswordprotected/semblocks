@@ -62,7 +62,7 @@ export function SearchCard({
     >
       <Suspense
         fallback={
-          <SearchForm initialQuery="" initialSid="" ownerMode={ownerMode} />
+          <SearchForm initialQuery="" initialSid="" initialDemo="" ownerMode={ownerMode} />
         }
       >
         <SearchFormFromParams ownerMode={ownerMode} />
@@ -77,6 +77,7 @@ function SearchFormFromParams({ ownerMode }: { ownerMode: boolean }) {
     <SearchForm
       initialQuery={params.get("q") ?? ""}
       initialSid={params.get("sid") ?? ""}
+      initialDemo={params.get("demo") ?? ""}
       params={params}
       ownerMode={ownerMode}
     />
@@ -86,11 +87,13 @@ function SearchFormFromParams({ ownerMode }: { ownerMode: boolean }) {
 function SearchForm({
   initialQuery,
   initialSid,
+  initialDemo,
   params,
   ownerMode,
 }: {
   initialQuery: string;
   initialSid: string;
+  initialDemo: string;
   params?: ReadonlyURLSearchParams | null;
   ownerMode: boolean;
 }) {
@@ -105,14 +108,21 @@ function SearchForm({
   const [, startTransition] = useTransition();
 
   // Keep the visible query in sync with the active URL source so the
-  // owner always sees exactly what's being searched (and can edit it):
+  // search box reflects the selected source:
+  //  - demo → stored demo label for public/demo mode
   //  - sid  → fetch the stored long query
   //  - img  → the caption the image produced (in-memory; empty after refresh)
   //  - q    → the raw query
   const qParam = params ? (params.get("q") ?? "") : initialQuery;
   const sidParam = params ? (params.get("sid") ?? "") : initialSid;
   const imgParam = params ? (params.get("img") ?? "") : "";
+  const demoParam = params ? (params.get("demo") ?? "") : initialDemo;
   useEffect(() => {
+    if (!ownerMode && demoParam) {
+      const demo = demos.find((d) => d.id === demoParam);
+      if (demo) setQuery(demo.label);
+      return;
+    }
     if (sidParam) {
       let cancelled = false;
       (async () => {
@@ -144,7 +154,7 @@ function SearchForm({
       return;
     }
     setQuery(qParam);
-  }, [qParam, sidParam, imgParam]);
+  }, [qParam, sidParam, imgParam, demoParam, demos, ownerMode]);
 
   // Non-owners get demo searches instead of live search.
   useEffect(() => {
@@ -342,9 +352,10 @@ function SearchForm({
       {!ownerMode && gateOpen ? (
         <DemoGate
           demos={demos}
-          onPick={(id) => {
+          onPick={(demo) => {
+            setQuery(demo.label);
             setGateOpen(false);
-            navigateSource("demo", id);
+            navigateSource("demo", demo.id);
           }}
           onClose={() => setGateOpen(false)}
         />
@@ -359,7 +370,7 @@ function DemoGate({
   onClose,
 }: {
   demos: DemoSummary[];
-  onPick: (id: string) => void;
+  onPick: (demo: DemoSummary) => void;
   onClose: () => void;
 }) {
   return (
@@ -388,7 +399,7 @@ function DemoGate({
             <button
               key={d.id}
               type="button"
-              onClick={() => onPick(d.id)}
+              onClick={() => onPick(d)}
               className="rounded-full border border-stroke px-3 py-1 text-sm text-neutral-800 hover:bg-black/5"
             >
               {d.is_image ? "🖼 " : ""}
