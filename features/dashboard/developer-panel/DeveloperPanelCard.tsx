@@ -79,6 +79,8 @@ export function DeveloperPanelCard({
 
 
   const loadStatus = useCallback(async (signal?: AbortSignal) => {
+    if (!ownerMode) return;
+
     setStatusLoading(true);
     setStatusError(null);
 
@@ -96,13 +98,20 @@ export function DeveloperPanelCard({
     } finally {
       if (!signal?.aborted) setStatusLoading(false);
     }
-  }, []);
+  }, [ownerMode]);
 
   useEffect(() => {
+    if (!ownerMode) {
+      setStatus(null);
+      setStatusLoading(false);
+      setStatusError(null);
+      return;
+    }
+
     const controller = new AbortController();
     void loadStatus(controller.signal);
     return () => controller.abort();
-  }, [loadStatus]);
+  }, [loadStatus, ownerMode]);
 
   const ingestUser = status?.profile?.username ?? null;
   const actionLocked = !ownerMode || Boolean(busyAction);
@@ -257,6 +266,7 @@ export function DeveloperPanelCard({
             status={status}
             statusError={statusError}
             statusLoading={statusLoading}
+            ownerMode={ownerMode}
             onRetry={() => void loadStatus()}
           />
         );
@@ -266,6 +276,7 @@ export function DeveloperPanelCard({
             status={status}
             statusError={statusError}
             statusLoading={statusLoading}
+            ownerMode={ownerMode}
             onRetry={() => void loadStatus()}
           />
         );
@@ -391,14 +402,16 @@ function IndexStatusSection({
   statusError,
   statusLoading,
   onRetry,
+  ownerMode,
 }: {
   status: DevStatusResponse | null;
   statusError: string | null;
   statusLoading: boolean;
   onRetry: () => void;
+  ownerMode: boolean;
 }) {
   if (!status) {
-    return <StatusPlaceholder error={statusError} loading={statusLoading} onRetry={onRetry} />;
+    return <StatusPlaceholder error={statusError} loading={statusLoading} ownerMode={ownerMode} onRetry={onRetry} />;
   }
 
   const profileLabel = status.profile
@@ -436,14 +449,16 @@ function EnrichmentSection({
   statusError,
   statusLoading,
   onRetry,
+  ownerMode,
 }: {
   status: DevStatusResponse | null;
   statusError: string | null;
   statusLoading: boolean;
   onRetry: () => void;
+  ownerMode: boolean;
 }) {
   if (!status) {
-    return <StatusPlaceholder error={statusError} loading={statusLoading} onRetry={onRetry} />;
+    return <StatusPlaceholder error={statusError} loading={statusLoading} ownerMode={ownerMode} onRetry={onRetry} />;
   }
 
   const counts = status.counts;
@@ -783,10 +798,12 @@ function StatusPlaceholder({
   error,
   loading,
   onRetry,
+  ownerMode,
 }: {
   error: string | null;
   loading: boolean;
   onRetry: () => void;
+  ownerMode: boolean;
 }) {
   if (error) {
     return (
@@ -796,6 +813,14 @@ function StatusPlaceholder({
           retry
         </button>
       </div>
+    );
+  }
+
+  if (!ownerMode) {
+    return (
+      <p className="text-sm leading-5 text-black/50">
+        Live index stats are only available in dev mode.
+      </p>
     );
   }
 

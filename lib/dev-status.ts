@@ -67,7 +67,7 @@ type CountRow = {
 
 type EmbeddableBlockRow = {
   search_text: string;
-  vector_block_id: number | null;
+  meta_block_id: number | null;
   input_hash: string | null;
   embedding_model: string | null;
 };
@@ -80,11 +80,10 @@ function countMissingOrStaleBlockEmbeddings(db: Database.Database): number {
   const rows = db
     .prepare(
       `SELECT b.search_text,
-              v.block_id AS vector_block_id,
+              m.block_id AS meta_block_id,
               m.input_hash,
               m.embedding_model
          FROM blocks b
-         LEFT JOIN vec_blocks v ON v.block_id = b.id
          LEFT JOIN block_embedding_meta m ON m.block_id = b.id
         WHERE b.search_text IS NOT NULL
           AND trim(b.search_text) <> ''`,
@@ -97,7 +96,7 @@ function countMissingOrStaleBlockEmbeddings(db: Database.Database): number {
     if (
       !isEmbeddingFresh(
         {
-          hasVector: row.vector_block_id !== null,
+          hasVector: row.meta_block_id !== null,
           input_hash: row.input_hash,
           embedding_model: row.embedding_model,
         },

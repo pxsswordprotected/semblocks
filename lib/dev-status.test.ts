@@ -160,6 +160,56 @@ test("summarizes profile, counts, missing embeddings, and logs", () => {
   }
 });
 
+
+test("counts missing and stale block embeddings from metadata without vec_blocks joins", () => {
+  const db = createDevStatusDb();
+  try {
+    db.exec(`
+      INSERT INTO blocks (id, search_text) VALUES
+        (1, 'fresh metadata only'),
+        (2, 'missing metadata'),
+        (3, 'stale hash'),
+        (4, 'stale model');
+    `);
+
+    const freshInput = blockEmbeddingInput("fresh metadata only");
+    const staleHashInput = blockEmbeddingInput("old text");
+    const staleModelInput = blockEmbeddingInput("stale model");
+    db.prepare(
+      `INSERT INTO block_embedding_meta (
+        block_id, input_hash, embedding_model, embedded_at, input_chars
+      ) VALUES (?, ?, ?, '2025-05-27T14:33:00Z', ?)`,
+    ).run(
+      1,
+      hashEmbeddingInput(freshInput),
+      "text-embedding-3-small",
+      freshInput.length,
+    );
+    db.prepare(
+      `INSERT INTO block_embedding_meta (
+        block_id, input_hash, embedding_model, embedded_at, input_chars
+      ) VALUES (?, ?, ?, '2025-05-27T14:33:00Z', ?)`,
+    ).run(
+      3,
+      hashEmbeddingInput(staleHashInput),
+      "text-embedding-3-small",
+      staleHashInput.length,
+    );
+    db.prepare(
+      `INSERT INTO block_embedding_meta (
+        block_id, input_hash, embedding_model, embedded_at, input_chars
+      ) VALUES (?, ?, ?, '2025-05-27T14:33:00Z', ?)`,
+    ).run(4, hashEmbeddingInput(staleModelInput), "old-model", staleModelInput.length);
+
+    const status = getDevStatus(db);
+
+    assert.equal(status.counts.embeddings, 0);
+    assert.equal(status.counts.embeddable_blocks, 4);
+    assert.equal(status.counts.missing_embeddings, 3);
+  } finally {
+    db.close();
+  }
+});
 test("returns null metadata and zero error counts for empty dev status tables", () => {
   const db = createDevStatusDb();
   try {
