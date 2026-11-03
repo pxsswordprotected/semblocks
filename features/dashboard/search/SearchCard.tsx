@@ -106,6 +106,30 @@ function SearchForm({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const hasText = query.trim().length > 0;
   const [, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const gateRef = useRef<HTMLDivElement | null>(null);
+
+  // Dismiss the demo gate on Escape or a pointer press outside the form and
+  // the gate itself.
+  useEffect(() => {
+    if (!gateOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setGateOpen(false);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (formRef.current?.contains(target)) return;
+      if (gateRef.current?.contains(target)) return;
+      setGateOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [gateOpen]);
 
   // Keep the visible query in sync with the active URL source so the
   // search box reflects the selected source:
@@ -292,7 +316,11 @@ function SearchForm({
 
   return (
     <>
-      <form onSubmit={submitText} className="flex w-full items-center gap-3">
+      <form
+        ref={formRef}
+        onSubmit={submitText}
+        className="flex w-full items-center gap-3"
+      >
         <button
           type="submit"
           aria-label="Search"
@@ -312,6 +340,9 @@ function SearchForm({
             setQuery(e.target.value);
           }}
           onFocus={() => {
+            if (!ownerMode) setGateOpen(true);
+          }}
+          onClick={() => {
             if (!ownerMode) setGateOpen(true);
           }}
           onPaste={handlePaste}
@@ -358,6 +389,7 @@ function SearchForm({
             navigateSource("demo", demo.id);
           }}
           onClose={() => setGateOpen(false)}
+          gateRef={gateRef}
         />
       ) : null}
     </>
@@ -368,13 +400,18 @@ function DemoGate({
   demos,
   onPick,
   onClose,
+  gateRef,
 }: {
   demos: DemoSummary[];
   onPick: (demo: DemoSummary) => void;
   onClose: () => void;
+  gateRef: React.Ref<HTMLDivElement>;
 }) {
   return (
-    <div className="absolute top-full left-0 z-20 mt-2 w-full rounded-base border border-stroke bg-white p-4 shadow-lg">
+    <div
+      ref={gateRef}
+      className="absolute top-full left-0 z-20 mt-2 w-full rounded-base border border-stroke bg-white p-4 shadow-lg"
+    >
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-5 text-black/60">
           Live search uses an OpenAI key. Clone the project to run it on your
