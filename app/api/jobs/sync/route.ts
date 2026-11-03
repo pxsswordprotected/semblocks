@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/admin-api";
 import { parseUserSlug } from "@/lib/arena";
-import { createJob } from "@/lib/jobs";
+import { abandonOrphanedActiveJobs, createJob } from "@/lib/jobs";
 import { startJob } from "@/lib/job-runner";
+import { getServerInstanceId } from "@/lib/server-instance";
 
 export const runtime = "nodejs";
 
@@ -17,9 +18,11 @@ export async function POST(req: Request) {
   }
 
   const username = parseUserSlug(userParam);
+  const dedupeKey = `sync_full:${username}`;
+  abandonOrphanedActiveJobs({ dedupeKey, ownerId: getServerInstanceId() });
   const { job } = createJob({
     jobType: "sync_full",
-    dedupeKey: `sync_full:${username}`,
+    dedupeKey,
     progressTotal: 6,
   });
   startJob(job.id);

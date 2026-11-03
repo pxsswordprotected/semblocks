@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 
 import {
+  abandonOrphanedActiveJobs,
   abandonStaleActiveJobs,
   appendJobEvent,
   createJob,
@@ -156,6 +157,64 @@ test("abandonStaleActiveJobs cancels only stale active jobs for a dedupe key", (
     });
     assert.equal(freshAbandoned, 0);
     assert.equal(getJob(fresh.job.id, db)?.status, "queued");
+  } finally {
+    db.close();
+  }
+});
+
+test("abandonOrphanedActiveJobs cancels active jobs owned by another server run", () => {
+  const db = createJobsDb();
+  try {
+    const { job } = createJob({ jobType: "sync_full", dedupeKey: "sync_full:u", db });
+    markJobRunning(job.id, "old-run", "Starting", db);
+    const other = createJob({ jobType: "sync_full", dedupeKey: "sync_full:other", db });
+
+    const abandoned = abandonOrphanedActiveJobs({
+      dedupeKey: "sync_full:u",
+      ownerId: "new-run",
+      db,
+    });
+    assert.equal(abandoned, 1);
+    assert.equal(getJob(job.id, db)?.status, "cancelled");
+    assert.equal(getJob(job.id, db)?.message, "Orphaned job abandoned");
+    assert.ok(
+      listJobEvents(job.id, { db }).some((e) => e.event_type === "orphan_abandoned"),
+    );
+    assert.equal(getJob(other.job.id, db)?.status, "queued");
+
+    const fresh = createJob({ jobType: "sync_full", dedupeKey: "sync_full:u", db });
+    assert.equal(fresh.created, true);
+    assert.notEqual(fresh.job.id, job.id);
+  } finally {
+    db.close();
+  }
+});
+
+test("abandonOrphanedActiveJobs keeps jobs owned by the current server run", () => {
+  const db = createJobsDb();
+  try {
+    const { job } = createJob({ jobType: "sync_full", dedupeKey: "sync_full:u", db });
+    markJobRunning(job.id, "this-run", "Starting", db);
+
+    const abandoned = abandonOrphanedActiveJobs({
+      dedupeKey: "sync_full:u",
+      ownerId: "this-run",
+      db,
+    });
+    assert.equal(abandoned, 0);
+    assert.equal(getJob(job.id, db)?.status, "running");
+    const again = createJob({ jobType: "sync_full", dedupeKey: "sync_full:u", db });
+    assert.equal(again.created, false);
+
+    const unowned = createJob({ jobType: "sync_full", dedupeKey: "sync_full:v", db });
+    assert.equal(unowned.job.worker_id, null);
+    const nullAbandoned = abandonOrphanedActiveJobs({
+      dedupeKey: "sync_full:v",
+      ownerId: "this-run",
+      db,
+    });
+    assert.equal(nullAbandoned, 1);
+    assert.equal(getJob(unowned.job.id, db)?.status, "cancelled");
   } finally {
     db.close();
   }

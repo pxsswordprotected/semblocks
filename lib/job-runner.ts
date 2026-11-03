@@ -16,6 +16,7 @@ import { extractPendingTranscripts } from "./transcripts.ts";
 import { processChunks } from "./chunks.ts";
 import { embedPendingBlocks } from "./embed-blocks.ts";
 import type { FullSyncResult } from "./full-sync.ts";
+import { getServerInstanceId } from "./server-instance.ts";
 import type { JobRow } from "./job-types.ts";
 
 const inFlight = new Set<string>();
@@ -25,10 +26,6 @@ class JobCancelledError extends Error {
     super("Job cancelled");
     this.name = "JobCancelledError";
   }
-}
-
-function workerId(): string {
-  return `${process.pid}:${Date.now().toString(36)}`;
 }
 
 function parseSyncUser(job: JobRow): string {
@@ -169,7 +166,7 @@ async function runJob(jobId: string): Promise<void> {
 
   inFlight.add(jobId);
   try {
-    const running = markJobRunning(jobId, workerId(), "Starting");
+    const running = markJobRunning(jobId, getServerInstanceId(), "Starting");
     if (!running || running.status !== "running") return;
     appendJobEvent(jobId, "info", "claimed", "Job runner started");
 

@@ -23,6 +23,12 @@ export type AbandonStaleActiveJobsOptions = {
   db?: Db;
 };
 
+export type AbandonOrphanedActiveJobsOptions = {
+  dedupeKey: string;
+  ownerId: string;
+  db?: Db;
+};
+
 
 function dbOrDefault(db?: Db): Db {
   return db ?? getDb();
@@ -285,6 +291,39 @@ export function abandonStaleActiveJobs(
   });
   tx();
   return staleJobs.length;
+}
+
+export function abandonOrphanedActiveJobs(
+  opts: AbandonOrphanedActiveJobsOptions,
+): number {
+  const store = dbOrDefault(opts.db);
+  const orphans = store
+    .prepare(
+      `SELECT * FROM jobs
+        WHERE dedupe_key = ?
+          AND status IN ('queued', 'running')
+          AND (worker_id IS NULL OR worker_id != ?)
+        ORDER BY created_at ASC`,
+    )
+    .all(opts.dedupeKey, opts.ownerId) as JobRow[];
+
+  if (orphans.length === 0) return 0;
+
+  const tx = store.transaction(() => {
+    for (const job of orphans) {
+      markJobCancelled(job.id, null, "Orphaned job abandoned", store);
+      appendJobEvent(
+        job.id,
+        "warn",
+        "orphan_abandoned",
+        "Orphaned job abandoned",
+        { previous_worker_id: job.worker_id },
+        store,
+      );
+    }
+  });
+  tx();
+  return orphans.length;
 }
 export function isJobCancelRequested(id: string, db?: Db): boolean {
   const row = rowById(dbOrDefault(db), id);
